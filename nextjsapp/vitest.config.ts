@@ -26,6 +26,18 @@ export default async () => {
           userAgent: 'vitest-jsdom',
         },
       },
+      coverage: {
+        provider: 'v8',
+        reporter: ['json', 'json-summary', 'lcov', 'html'],
+        include: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'utils/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}'],
+        exclude: [
+          'node_modules/',
+          'tests/',
+          '.next/',
+          'cypress/',
+        ],
+        reportsDirectory: 'coverage',
+      },
     },
   })
 }
