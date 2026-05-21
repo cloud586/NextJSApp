@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
+    "test:coverage": "vitest run --coverage",
     "cy:open": "cypress open --config baseUrl=http://localhost:3001",
     "cy:run": "cypress run --config baseUrl=http://localhost:3001"
   },
@@ -28,6 +29,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react-swc": "^4",
+    "@vitest/coverage-v8": "^1.6.1",
     "cypress": "^14.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
