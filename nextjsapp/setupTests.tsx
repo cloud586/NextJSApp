@@ -2,11 +2,14 @@ import React, { forwardRef } from 'react'
 import { vi } from 'vitest'
 import '@testing-library/jest-dom'
 
-const NextLink = ({ href, children, ...props }: { href?: string; children: React.ReactNode }) => (
-  <a href={typeof href === 'string' ? href : href?.toString()} {...props}>
-    {children}
-  </a>
-)
+const NextLink = ({ href, children, ...props }: { href?: string | null | undefined; children: React.ReactNode }) => {
+  const resolvedHref = href == null ? undefined : String(href)
+  return (
+    <a href={resolvedHref} {...props}>
+      {children}
+    </a>
+  )
+}
 
 const NextImage = forwardRef<HTMLImageElement, React.ImgHTMLAttributes<HTMLImageElement> & { src: string | { src: string } }>(
   ({ src, alt, ...props }, ref) => {

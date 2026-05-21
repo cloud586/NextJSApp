@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:test": "next dev -p 3001",
-    "build": "next build",
+    "dev:test": "next dev --webpack -p 3001",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
@@ -13,8 +13,11 @@
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
     "test:coverage": "vitest run --coverage",
+    "dev:coverage": "cross-env CYPRESS=true next dev --webpack -p 3001",
     "cy:open": "cypress open --config baseUrl=http://localhost:3001",
-    "cy:run": "cypress run --config baseUrl=http://localhost:3001"
+    "cy:run": "cypress run --config baseUrl=http://localhost:3001",
+    "cy:coverage": "cross-env CYPRESS=true start-server-and-test dev:coverage http://localhost:3001 cy:coverage:run",
+    "cy:coverage:run": "cypress run --config baseUrl=http://localhost:3001 --env coverage=true"
   },
   "dependencies": {
     "next": "^16.2.6",
@@ -22,6 +25,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@cypress/code-coverage": "^3.14.7",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16",
@@ -30,10 +34,13 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react-swc": "^4",
     "@vitest/coverage-v8": "^1.6.1",
+    "cross-env": "^7.0.3",
     "cypress": "^14.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "istanbul-lib-instrument": "^5.2.1",
     "jsdom": "^29.1.1",
+    "start-server-and-test": "^3.0.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite": "^5",

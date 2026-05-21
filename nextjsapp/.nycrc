@@ -1,0 +1,6 @@
+{
+  "report-dir": "./coverage/e2e",
+  "temp-dir": "./coverage/e2e/.nyc_output",
+  "reporter": ["html", "lcov", "text-summary"],
+  "exclude": ["cypress/**", "node_modules/**", ".next/**"]
+}
