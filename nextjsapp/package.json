@@ -4,13 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:test": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
-    "test:component": "vitest run tests/component"
+    "test:component": "vitest run tests/component",
+    "cy:open": "cypress open --config baseUrl=http://localhost:3001",
+    "cy:run": "cypress run --config baseUrl=http://localhost:3001"
   },
   "dependencies": {
     "next": "^16.2.6",
@@ -25,6 +28,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react-swc": "^4",
+    "cypress": "^14.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "jsdom": "^29.1.1",
