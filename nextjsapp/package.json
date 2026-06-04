@@ -20,9 +20,12 @@
     "cy:coverage:run": "cypress run --config baseUrl=http://localhost:3001 --env coverage=true"
   },
   "dependencies": {
+    "launchdarkly-node-server-sdk": "^7.0.4",
+    "launchdarkly-react-client-sdk": "^3.9.1",
     "next": "^16.2.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@cypress/code-coverage": "^3.14.7",
