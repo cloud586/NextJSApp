@@ -1,6 +1,10 @@
 FROM alma-ubi:latest
 
 ENV NODE_ENV=production
+# Runtime: pass LD_SDK_KEY when starting the container, e.g.:
+#   docker run -p 3002:3000 --env-file .env.local nextjs-frontend
+# NEXT_PUBLIC_LD_CLIENT_SIDE_ID must be present when running `npm run build`
+# (baked into the client bundle at build time).
 WORKDIR /app
 
 USER root
