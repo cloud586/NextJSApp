@@ -1,9 +1,31 @@
 import path from 'path';
 import type { NextConfig } from 'next';
 
+// newrelic/load-externals is a CommonJS module with no type declarations
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const nrExternals = require('newrelic/load-externals');
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // New Relic is preloaded via NODE_OPTIONS at runtime; standalone file tracing
+  // only copies a subset unless we explicitly include the full agent tree.
+  outputFileTracingIncludes: {
+    '/*': [
+      './node_modules/newrelic/**',
+      './node_modules/@newrelic/**',
+      './node_modules/@apm-js-collab/**',
+    ],
+  },
+  // Native NR addons lock .node files on Windows and break subsequent builds.
+  outputFileTracingExcludes: {
+    '/*': [
+      './node_modules/@newrelic/native-metrics/**',
+      './node_modules/@newrelic/fn-inspect/**',
+      './node_modules/@datadog/pprof/**',
+    ],
+  },
   webpack(config, { isServer }) {
+    nrExternals(config);
     if (process.env.CYPRESS === 'true' && !isServer) {
       const coverageLoader = path.resolve(
         __dirname,
