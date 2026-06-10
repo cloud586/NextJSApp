@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { LDProvider } from "launchdarkly-react-client-sdk";
 import type { LDContext, LDFlagSet } from "launchdarkly-js-client-sdk";
+import { useLogging } from "@/components/LoggingProvider";
+import { X_CORRELATION_ID } from "@/lib/logging/constants";
 
 interface LDProviderWrapperProps {
   children: React.ReactNode;
@@ -36,6 +38,7 @@ export function LDProviderWrapper({
   initialBootstrap,
   initialHash,
 }: LDProviderWrapperProps) {
+  const { correlationId, getLogger } = useLogging();
   const [hash, setHash] = useState<string | null>(initialHash ?? null);
   const [context, setContext] = useState<LDContext>(initialContext);
 
@@ -44,7 +47,12 @@ export function LDProviderWrapper({
       return;
     }
 
-    fetch("/api/ld-secure-hash")
+    const headers: HeadersInit = {};
+    if (correlationId) {
+      headers[X_CORRELATION_ID] = correlationId;
+    }
+
+    fetch("/api/ld-secure-hash", { headers })
       .then((res) => {
         if (!res.ok) throw new Error(`Secure hash request failed: ${res.status}`);
         return res.json() as Promise<SecureHashResponse>;
@@ -54,14 +62,19 @@ export function LDProviderWrapper({
         setHash(secureHash);
       })
       .catch((err) => {
-        console.error("Failed to initialize LaunchDarkly secure mode:", err);
+        getLogger("LDProviderWrapper").error(
+          "Failed to initialize LaunchDarkly secure mode:",
+          err,
+        );
       });
-  }, [initialHash]);
+  }, [initialHash, correlationId, getLogger]);
 
   const clientSideID = process.env.NEXT_PUBLIC_LD_CLIENT_SIDE_ID;
   if (!clientSideID || !hash) {
     if (!clientSideID) {
-      console.error("NEXT_PUBLIC_LD_CLIENT_SIDE_ID is not set");
+      getLogger("LDProviderWrapper").error(
+        "NEXT_PUBLIC_LD_CLIENT_SIDE_ID is not set",
+      );
     }
     return <>{children}</>;
   }

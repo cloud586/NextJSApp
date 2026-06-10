@@ -1,15 +1,17 @@
 FROM alma-ubi:latest
 
 ENV NODE_ENV=production
-# Runtime: pass LD_SDK_KEY when starting the container, e.g.:
+# Runtime: pass LD_SDK_KEY and New Relic vars when starting the container, e.g.:
 #   docker run -p 3002:3000 --env-file .env.local nextjs-frontend
+# Build with: npm run build  (from project root, with node_modules present)
 # NEXT_PUBLIC_LD_CLIENT_SIDE_ID must be present when running `npm run build`
 # (baked into the client bundle at build time).
+# NEW_RELIC_APP_NAME and NEW_RELIC_LICENSE_KEY enable APM + log forwarding.
 WORKDIR /app
 
 USER root
 RUN microdnf module reset nodejs \
-    && microdnf module enable nodejs:20 -y \
+    && microdnf module enable nodejs:22 -y \
     && microdnf install -y nodejs npm \
     && microdnf clean all \
     && rm -rf /var/cache/dnf /var/cache/yum
@@ -17,7 +19,13 @@ RUN microdnf module reset nodejs \
 COPY --chown=appuser:appuser .next/standalone /app
 COPY --chown=appuser:appuser .next/static /app/.next/static
 COPY --chown=appuser:appuser public /app/public
+COPY --chown=appuser:appuser newrelic.js /app/newrelic.js
+# Standalone tracing only copies a partial New Relic agent; overlay the full tree.
+COPY --chown=appuser:appuser node_modules /build-node_modules
+COPY --chown=appuser:appuser scripts/sync-newrelic-standalone.mjs /tmp/sync-newrelic-standalone.mjs
+RUN SOURCE_NODE_MODULES=/build-node_modules STANDALONE_DIR=/app node /tmp/sync-newrelic-standalone.mjs \
+    && rm -rf /build-node_modules /tmp/sync-newrelic-standalone.mjs
 
 EXPOSE 3000
 USER appuser
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "NODE_OPTIONS='--require newrelic --import newrelic/esm-loader.mjs' node server.js"]

@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { LD_USER_ID_COOKIE } from "./lib/ldContext";
+import {
+  applyCorrelationId,
+  setCorrelationResponseHeaders,
+} from "./lib/logging/middlewareCorrelation";
 
 /**
- * Ensure every visitor has a stable LaunchDarkly user key.
- *
- * Without this cookie, each page load would look like a brand-new anonymous
- * user and targeting/rollouts would not stick across sessions.
+ * Ensure every visitor has a stable LaunchDarkly user key and a correlation ID
+ * for request tracing across middleware, SSR, API routes, and client logs.
  */
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+  const { correlationId, requestHeaders } = applyCorrelationId(request);
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+
+  setCorrelationResponseHeaders(response, correlationId);
 
   if (!request.cookies.get(LD_USER_ID_COOKIE)) {
     response.cookies.set(LD_USER_ID_COOKIE, crypto.randomUUID(), {

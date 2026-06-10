@@ -1,3 +1,5 @@
+// Webpack loader — must use CommonJS require.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createInstrumenter } = require('istanbul-lib-instrument');
 
 module.exports = function (source, inputSourceMap) {
