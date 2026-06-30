@@ -1,0 +1,5 @@
+location        = "centralus"
+acr_location    = "centralus"
+name_prefix     = "nextjsapp-prod"
+# container_image defaults to nextjsappprodacr.azurecr.io/nextjsapp:latest after apply
+ld_client_side_id = ""

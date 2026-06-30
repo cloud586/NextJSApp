@@ -1,6 +1,6 @@
 import * as LaunchDarkly from "@launchdarkly/node-server-sdk";
 import type { LDClient } from "@launchdarkly/node-server-sdk";
-
+import { getServerConfig } from "@/lib/config/env";
 /**
  * Singleton LaunchDarkly Node SDK client.
  *
@@ -12,13 +12,12 @@ let clientPromise: Promise<LDClient> | null = null;
 
 export function getServerLDClient(): Promise<LDClient> {
   if (!clientPromise) {
-    const sdkKey = process.env.LD_SDK_KEY;
+    const sdkKey = getServerConfig().ldSdkKey;
     if (!sdkKey) {
       throw new Error(
-        "LD_SDK_KEY is not set. Add it to .env.local for server-side flag evaluation.",
+        "LD_SDK_KEY is not set. Configure it in Azure App Configuration or .env.local.",
       );
     }
-
     const client = LaunchDarkly.init(sdkKey);
     clientPromise = client.waitForInitialization({ timeout: 10 }).then(() => client);
   }

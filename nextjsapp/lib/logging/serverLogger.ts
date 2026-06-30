@@ -1,10 +1,11 @@
 import pino from "pino";
+import { getServerConfig } from "@/lib/config/env";
 import { getCorrelationId } from "./correlationId";
 
 const isDev = process.env.NODE_ENV !== "production";
 
 export const serverLogger = pino({
-  level: process.env.LOG_LEVEL ?? "info",
+  level: getServerConfig().logLevel,
   ...(isDev
     ? {
         transport: {

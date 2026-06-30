@@ -3,7 +3,7 @@ import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { LDProviderWrapper } from "@/components/LDProviderWrapper";
 import { LoggingProvider } from "@/components/LoggingProvider";
-import { isLDSdkConfigured } from "@/lib/ldConfig";
+import { isLDSdkConfigured, getServerConfig } from "@/lib/config/env";
 import { getLDContext } from "@/lib/ldContext";
 import { HOMEPAGE_EXPERIMENTAL_BANNER } from "@/lib/ldFlags";
 import { computeSecureModeHash } from "@/lib/ldSecureHash";
@@ -32,12 +32,14 @@ interface RootShellProps {
   children: React.ReactNode;
   correlationId: string;
   browserTimingHeader: string;
+  clientLogLevel?: string;
 }
 
 function RootShell({
   children,
   correlationId,
   browserTimingHeader,
+  clientLogLevel,
 }: RootShellProps) {
   return (
     <html
@@ -55,7 +57,10 @@ function RootShell({
             dangerouslySetInnerHTML={{ __html: browserTimingHeader }}
           />
         ) : null}
-        <LoggingProvider correlationId={correlationId}>
+        <LoggingProvider
+          correlationId={correlationId}
+          clientLogLevel={clientLogLevel}
+        >
           {children}
         </LoggingProvider>
       </body>
@@ -71,6 +76,7 @@ export default async function RootLayout({
   const correlationId = await getCorrelationId();
   const browserTimingHeader = await getNewRelicBrowserTimingHeader();
   const logger = await getRequestLogger({ component: "RootLayout" });
+  const { ldSdkKey, ldClientSideId, clientLogLevel } = getServerConfig();
   logger.info("Rendering root layout");
 
   // Without LD_SDK_KEY (common in Docker if env is not passed), render the app
@@ -80,6 +86,7 @@ export default async function RootLayout({
       <RootShell
         correlationId={correlationId}
         browserTimingHeader={browserTimingHeader}
+        clientLogLevel={clientLogLevel}
       >
         {children}
       </RootShell>
@@ -93,17 +100,19 @@ export default async function RootLayout({
 
   const flagsState = await client.allFlagsState(context);
   const bootstrap = flagsState.toJSON();
-  const hash = computeSecureModeHash(context.key, process.env.LD_SDK_KEY!);
+  const hash = computeSecureModeHash(context.key, ldSdkKey!);
 
   return (
     <RootShell
       correlationId={correlationId}
       browserTimingHeader={browserTimingHeader}
+      clientLogLevel={clientLogLevel}
     >
       <LDProviderWrapper
         initialContext={context}
         initialBootstrap={bootstrap}
         initialHash={hash}
+        clientSideID={ldClientSideId}
       >
         {children}
       </LDProviderWrapper>
