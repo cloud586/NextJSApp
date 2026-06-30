@@ -3,31 +3,31 @@ name: Logging Architecture Plan
 overview: "Full-stack logging for Next.js 16 App Router: Loglevel (client), Pino (server), correlation IDs, and New Relic Browser + Node agents (production-only) with log forwarding. Implemented on branch APP-0005-Logging-NewRelic."
 todos:
   - id: prereq-ld
-    content: "Prerequisite — branch must include LaunchDarkly work from APP-0004-LaunchDarkly-2 (lib/ld*, LDProviderWrapper, middleware LD cookie, api/ld-secure-hash)"
+    content: Prerequisite — branch must include LaunchDarkly work from APP-0004-LaunchDarkly-2 (lib/ld*, LDProviderWrapper, middleware LD cookie, api/ld-secure-hash)
     status: completed
   - id: deps-config
-    content: "Add newrelic ^14.1.0, pino, pino-pretty, loglevel; Node >=22 (.nvmrc, engines); newrelic.js; package.json start/prebuild scripts; next.config.ts webpack externals + file tracing includes/excludes"
+    content: Add newrelic ^14.1.0, pino, pino-pretty, loglevel; Node >=22 (.nvmrc, engines); newrelic.js; package.json start/prebuild scripts; next.config.ts webpack externals + file tracing includes/excludes
     status: completed
   - id: correlation-middleware
-    content: "lib/logging/constants.ts, correlationId.ts, middlewareCorrelation.ts; extend middleware.ts for x-correlation-id + LD cookie"
+    content: lib/logging/constants.ts, correlationId.ts, middlewareCorrelation.ts; extend middleware.ts for x-correlation-id + LD cookie
     status: completed
   - id: server-logger
-    content: "serverLogger.ts + getRequestLogger.ts; integrate into layout.tsx and api/ld-secure-hash/route.ts"
+    content: serverLogger.ts + getRequestLogger.ts; integrate into layout.tsx and api/ld-secure-hash/route.ts
     status: completed
   - id: client-logger
-    content: "clientLogger.ts + LoggingProvider.tsx; wire layout.tsx; update LDProviderWrapper.tsx; pass correlation ID on client fetch"
+    content: clientLogger.ts + LoggingProvider.tsx; wire layout.tsx; update LDProviderWrapper.tsx; pass correlation ID on client fetch
     status: completed
   - id: newrelic-browser
-    content: "newrelicBrowser.ts + getBrowserTimingHeader in layout.tsx; wrapLogger on loglevel; skip injection during next build"
+    content: newrelicBrowser.ts + getBrowserTimingHeader in layout.tsx; wrapLogger on loglevel; skip injection during next build
     status: completed
   - id: docker-prod
-    content: "Dockerfile.runtime — Node 22, COPY newrelic.js, sync-newrelic-standalone.mjs at image build; NODE_OPTIONS preload in CMD"
+    content: Dockerfile.runtime — Node 22, COPY newrelic.js, sync-newrelic-standalone.mjs at image build; NODE_OPTIONS preload in CMD
     status: completed
   - id: build-hardening
-    content: "prebuild-clean-standalone.mjs; exclude NR native addons from tracing; do NOT postbuild-sync into local .next/standalone"
+    content: prebuild-clean-standalone.mjs; exclude NR native addons from tracing; do NOT postbuild-sync into local .next/standalone
     status: completed
   - id: tests
-    content: "Vitest unit + component tests; optional cypress/e2e/logging.cy.ts"
+    content: Vitest unit + component tests; optional cypress/e2e/logging.cy.ts
     status: completed
 isProject: false
 ---

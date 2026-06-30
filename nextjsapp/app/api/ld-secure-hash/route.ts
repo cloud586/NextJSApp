@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLDContext } from "@/lib/ldContext";
-import { computeSecureModeHash } from "@/lib/ldSecureHash";
+import { getServerConfig } from "@/lib/config/env";
+import { getLDContext } from "@/lib/ldContext";import { computeSecureModeHash } from "@/lib/ldSecureHash";
 import { getRequestLogger } from "@/lib/logging/getRequestLogger";
 
 /**
@@ -15,7 +15,7 @@ export async function GET() {
   const logger = await getRequestLogger({ route: "ld-secure-hash" });
   logger.info("Handling secure hash request");
 
-  const sdkKey = process.env.LD_SDK_KEY;
+  const sdkKey = getServerConfig().ldSdkKey;
   if (!sdkKey) {
     logger.error("LD_SDK_KEY is not configured");
     return NextResponse.json(

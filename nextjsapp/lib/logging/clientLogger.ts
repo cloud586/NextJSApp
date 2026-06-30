@@ -27,21 +27,28 @@ declare global {
   }
 }
 
-function getDefaultClientLogLevel(): log.LogLevelDesc {
-  if (process.env.NEXT_PUBLIC_LOG_LEVEL) {
-    return process.env.NEXT_PUBLIC_LOG_LEVEL as log.LogLevelDesc;
+function getDefaultClientLogLevel(
+  clientLogLevel?: string,
+): log.LogLevelDesc {
+  if (clientLogLevel) {
+    return clientLogLevel as log.LogLevelDesc;
   }
   return process.env.NODE_ENV === "production" ? "warn" : "debug";
 }
 
 let rootConfigured = false;
+let rootClientLogLevel: string | undefined;
 
-function configureRootLogger(): void {
-  if (rootConfigured || typeof window === "undefined") {
+function configureRootLogger(clientLogLevel?: string): void {
+  if (rootConfigured && rootClientLogLevel === clientLogLevel) {
     return;
   }
-  log.setLevel(getDefaultClientLogLevel());
+  if (typeof window === "undefined") {
+    return;
+  }
+  log.setLevel(getDefaultClientLogLevel(clientLogLevel));
   rootConfigured = true;
+  rootClientLogLevel = clientLogLevel;
 }
 
 function wrapWithNewRelic(
@@ -75,10 +82,11 @@ function wrapWithNewRelic(
 export function getClientLogger(
   name: string,
   correlationId: string | null = null,
+  clientLogLevel?: string,
 ): Logger {
-  configureRootLogger();
+  configureRootLogger(clientLogLevel);
   const logger = log.getLogger(name);
-  logger.setLevel(getDefaultClientLogLevel());
+  logger.setLevel(getDefaultClientLogLevel(clientLogLevel));
 
   if (typeof window !== "undefined") {
     wrapWithNewRelic(logger, name, correlationId);
@@ -90,4 +98,5 @@ export function getClientLogger(
 /** Reset root configuration — for tests only. */
 export function resetClientLoggerForTests(): void {
   rootConfigured = false;
+  rootClientLogLevel = undefined;
 }

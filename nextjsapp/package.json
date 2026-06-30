@@ -10,7 +10,7 @@
     "dev:test": "next dev --webpack -p 3001",
     "prebuild": "node scripts/prebuild-clean-standalone.mjs",
     "build": "next build --webpack",
-    "start": "cross-env NODE_OPTIONS=--require newrelic --import newrelic/esm-loader.mjs next start",
+    "start": "node scripts/bootstrap-config.mjs",
     "lint": "eslint",
     "test": "vitest",
     "test:watch": "vitest",
@@ -24,6 +24,9 @@
     "cy:coverage:run": "cypress run --config baseUrl=http://localhost:3001 --env coverage=true"
   },
   "dependencies": {
+    "@azure/app-configuration": "^1.12.1",
+    "@azure/app-configuration-provider": "^2.4.2",
+    "@azure/identity": "^4.13.1",
     "@launchdarkly/node-server-sdk": "^9.11.2",
     "launchdarkly-react-client-sdk": "^3.9.2",
     "loglevel": "^1.9.2",

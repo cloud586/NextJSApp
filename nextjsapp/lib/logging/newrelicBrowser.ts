@@ -3,8 +3,10 @@
  * Safe to call without NEW_RELIC_LICENSE_KEY — returns empty string.
  * Skipped during `next build` to avoid blocking on agent connection.
  */
+import { isNewRelicConfigured } from "@/lib/config/env";
+
 export async function getNewRelicBrowserTimingHeader(): Promise<string> {
-  if (!process.env.NEW_RELIC_LICENSE_KEY) {
+  if (!isNewRelicConfigured()) {
     return "";
   }
 

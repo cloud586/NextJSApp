@@ -1,6 +1,6 @@
 /**
- * Next.js standalone file tracing copies only a subset of the New Relic agent.
- * Copies the full newrelic dependency tree into the standalone output.
+ * Next.js standalone file tracing copies only a subset of runtime dependencies.
+ * Copies full dependency trees for New Relic and Azure App Configuration bootstrap.
  *
  * Env overrides (used by Dockerfile.runtime):
  *   SOURCE_NODE_MODULES — source node_modules dir (default: <project>/node_modules)
@@ -96,9 +96,19 @@ const SKIP_PACKAGES = new Set([
   "@datadog/pprof",
 ]);
 
-const packages = collectTransitiveDeps("newrelic").filter(
-  (name) => !SKIP_PACKAGES.has(name),
-);
+const ROOT_PACKAGES = [
+  "newrelic",
+  "@azure/app-configuration-provider",
+  "@azure/identity",
+];
+
+const packages = [
+  ...new Set(
+    ROOT_PACKAGES.flatMap((root) => collectTransitiveDeps(root)).filter(
+      (name) => !SKIP_PACKAGES.has(name),
+    ),
+  ),
+];
 
 for (const name of packages) {
   const srcPath = resolvePackageDir(name);
@@ -109,5 +119,5 @@ for (const name of packages) {
 }
 
 console.log(
-  `Synced ${packages.length} New Relic-related packages into ${standaloneDir}.`,
+  `Synced ${packages.length} runtime package(s) into ${standaloneDir}.`,
 );

@@ -48,11 +48,13 @@ function resolveClientCorrelationId(
 interface LoggingProviderProps {
   children: ReactNode;
   correlationId?: string | null;
+  clientLogLevel?: string;
 }
 
 export function LoggingProvider({
   children,
   correlationId: serverCorrelationId,
+  clientLogLevel,
 }: LoggingProviderProps) {
   const correlationId = useMemo(
     () => resolveClientCorrelationId(serverCorrelationId),
@@ -62,9 +64,10 @@ export function LoggingProvider({
   const value = useMemo<LoggingContextValue>(
     () => ({
       correlationId,
-      getLogger: (name: string) => getClientLogger(name, correlationId),
+      getLogger: (name: string) =>
+        getClientLogger(name, correlationId, clientLogLevel),
     }),
-    [correlationId],
+    [correlationId, clientLogLevel],
   );
 
   return (

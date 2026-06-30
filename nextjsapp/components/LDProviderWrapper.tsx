@@ -17,6 +17,8 @@ interface LDProviderWrapperProps {
   initialBootstrap?: LDFlagSet;
   /** Server-computed secure-mode hash so LDProvider can mount on first render. */
   initialHash?: string;
+  /** LaunchDarkly client-side ID from server config (never from NEXT_PUBLIC_*). */
+  clientSideID?: string;
 }
 
 interface SecureHashResponse {
@@ -37,6 +39,7 @@ export function LDProviderWrapper({
   initialContext,
   initialBootstrap,
   initialHash,
+  clientSideID,
 }: LDProviderWrapperProps) {
   const { correlationId, getLogger } = useLogging();
   const [hash, setHash] = useState<string | null>(initialHash ?? null);
@@ -69,11 +72,10 @@ export function LDProviderWrapper({
       });
   }, [initialHash, correlationId, getLogger]);
 
-  const clientSideID = process.env.NEXT_PUBLIC_LD_CLIENT_SIDE_ID;
   if (!clientSideID || !hash) {
     if (!clientSideID) {
       getLogger("LDProviderWrapper").error(
-        "NEXT_PUBLIC_LD_CLIENT_SIDE_ID is not set",
+        "LaunchDarkly client-side ID is not configured",
       );
     }
     return <>{children}</>;

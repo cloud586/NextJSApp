@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
       './node_modules/newrelic/**',
       './node_modules/@newrelic/**',
       './node_modules/@apm-js-collab/**',
+      './node_modules/@azure/**',
+      './node_modules/@typespec/**',
+      './scripts/bootstrap-config.mjs',
     ],
   },
   // Native NR addons lock .node files on Windows and break subsequent builds.
