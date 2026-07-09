@@ -82,3 +82,9 @@ variable "managed_identity_client_id" {
   type        = string
   description = "User-assigned managed identity client ID."
 }
+
+variable "custom_domain_hostname" {
+  type        = string
+  description = "FQDN to bind (e.g. app.sutoremu.com). Null disables custom domain and managed certificate."
+  default     = null
+}

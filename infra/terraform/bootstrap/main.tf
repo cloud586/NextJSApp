@@ -23,7 +23,7 @@ resource "azurerm_storage_account" "tfstate" {
   min_tls_version          = "TLS1_2"
 
   blob_properties {
-    versioning_enabled       = true
+    versioning_enabled = true
     delete_retention_policy {
       days = 30
     }

@@ -16,8 +16,8 @@ provider "azurerm" {
       recover_soft_deleted_key_vaults = true
     }
     app_configuration {
-      purge_soft_delete_on_destroy        = true
-      recover_soft_deleted                = true
+      purge_soft_delete_on_destroy = true
+      recover_soft_deleted         = true
     }
     resource_group {
       prevent_deletion_if_contains_resources = true

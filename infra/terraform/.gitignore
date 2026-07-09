@@ -1,5 +1,6 @@
 **/.terraform/
 **/terraform.tfvars
 **/backend.hcl
+**/contact_info.json
 *.tfstate
 *.tfstate.*

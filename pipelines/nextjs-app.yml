@@ -1,0 +1,42 @@
+# Trunk-based build pipeline for the Next.js app.
+# CI: merges to main publish to dev ACR.
+# Release: v* tags on main publish to prod ACR.
+# PRs to main run full validation without publishing.
+#
+# CI/CD settings (ACR, SonarCloud) are loaded at runtime from Azure App Configuration
+# and Key Vault — no Azure DevOps variable groups required.
+#
+# Registered in Azure DevOps (sutoremu) against this GitHub repository.
+
+trigger:
+  branches:
+    include:
+      - main
+  tags:
+    include:
+      - v*
+  paths:
+    include:
+      - nextjsapp/**
+      - pipelines/**
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - nextjsapp/**
+      - pipelines/**
+
+extends:
+  template: pipeline-templates/node-service-build.yml
+  parameters:
+    serviceName: nextjsapp
+    workingDirectory: nextjsapp
+    imageRepository: nextjsapp
+    trunkBranch: main
+    # Match terraform output app_configuration_endpoint per environment.
+    # Update if name_prefix differs from the default nextjsapp-dev / nextjsapp-prod.
+    devAppConfigEndpoint: https://nextjsappdevappcfg.azconfig.io
+    prodAppConfigEndpoint: https://nextjsappprodappcfg.azconfig.io

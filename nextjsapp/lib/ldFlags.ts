@@ -12,3 +12,6 @@
 
 /** Controls whether the experimental homepage banner is shown. */
 export const HOMEPAGE_EXPERIMENTAL_BANNER = "homepage.experimentalBanner";
+
+/** Controls visibility of the Signup button on the marketing frontpage. */
+export const AUTH_SIGNUP_ENABLED = "auth.signupEnabled";

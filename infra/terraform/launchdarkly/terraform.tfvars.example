@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and set values. Do not commit terraform.tfvars.
+#
+# 1. List existing projects (recommended if you already use LaunchDarkly in .env.local):
+#      $env:LAUNCHDARKLY_ACCESS_TOKEN = "your-api-token"
+#      .\scripts\list-launchdarkly-projects.ps1
+# 2. Set ld_project_key to the key from that output (lowercase, e.g. default or sutoremu).
+# 3. Set ld_environment_keys to your environment key(s), e.g. ["test"].
+
+create_project = false
+
+# Use the project KEY from the dashboard or list-launchdarkly-projects.ps1 — not the display name.
+ld_project_key      = "default"
+ld_project_name     = "Sutoremu"
+ld_environment_keys = ["test"]
+
+# Set true only when creating a brand-new project (no existing LD_SDK_KEY for this project):
+# create_project      = true
+# ld_project_key      = "sutoremu"
+# ld_environment_keys = ["test"]
+
+# Optional if LAUNCHDARKLY_ACCESS_TOKEN is not set in the shell:
+# launchdarkly_access_token = "your-api-token"

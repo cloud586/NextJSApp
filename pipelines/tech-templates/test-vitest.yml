@@ -1,0 +1,16 @@
+parameters:
+  - name: workingDirectory
+    type: string
+
+steps:
+  - script: npm run test:coverage
+    displayName: npm run test:coverage
+    workingDirectory: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish coverage report
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}/coverage
+      artifact: coverage-report
+      publishLocation: pipeline
