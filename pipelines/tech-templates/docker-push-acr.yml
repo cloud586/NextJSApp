@@ -1,0 +1,46 @@
+parameters:
+  - name: acrServiceConnection
+    type: string
+  - name: acrLoginServer
+    type: string
+  - name: imageRepository
+    type: string
+  - name: localImageTag
+    type: string
+  - name: imageTags
+    type: object
+
+steps:
+  - task: DownloadPipelineArtifact@2
+    displayName: Download Docker image artifact
+    inputs:
+      artifact: docker-image
+      path: $(Pipeline.Workspace)/docker-image
+
+  - bash: |
+      set -euo pipefail
+      docker load -i "$(Pipeline.Workspace)/docker-image/image.tar"
+    displayName: Load Docker image
+
+  - task: Docker@2
+    displayName: Log in to Azure Container Registry
+    inputs:
+      command: login
+      containerRegistry: ${{ parameters.acrServiceConnection }}
+
+  - ${{ each tag in parameters.imageTags }}:
+    - bash: |
+        set -euo pipefail
+        docker tag "${{ parameters.imageRepository }}:${{ parameters.localImageTag }}" \
+          "${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:${{ tag }}"
+        echo "Tagged ${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:${{ tag }}"
+      displayName: Tag image — ${{ tag }}
+
+  - task: Docker@2
+    displayName: Push image to ACR
+    inputs:
+      command: push
+      containerRegistry: ${{ parameters.acrServiceConnection }}
+      repository: ${{ parameters.imageRepository }}
+      tags: |
+        ${{ join('\n', parameters.imageTags) }}

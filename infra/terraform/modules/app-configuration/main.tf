@@ -1,7 +1,7 @@
 locals {
   kv_ref_content_type = "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8"
 
-  key_vault_refs = {
+  app_key_vault_refs = {
     "app:ld:sdk-key" = {
       secret_name = "ld-sdk-key"
     }
@@ -10,22 +10,40 @@ locals {
     }
   }
 
-  plain_keys = {
+  cicd_key_vault_refs = {
+    "cicd:sonar:token" = {
+      secret_name = "sonar-token"
+    }
+  }
+
+  key_vault_refs = merge(local.app_key_vault_refs, local.cicd_key_vault_refs)
+
+  app_plain_keys = {
     "app:newrelic:app-name"    = var.new_relic_app_name
     "app:logging:server-level" = var.log_level
     "app:logging:client-level" = var.client_log_level
     "app:ld:client-side-id"    = var.ld_client_side_id
+    "app:assets:base-url"      = var.static_assets_base_url
   }
+
+  cicd_plain_keys = {
+    "cicd:acr:login-server"     = var.cicd_acr_login_server
+    "cicd:acr:name"               = var.cicd_acr_name
+    "cicd:sonar:organization"     = var.cicd_sonar_organization
+    "cicd:sonar:project-key"      = var.cicd_sonar_project_key
+  }
+
+  plain_keys = merge(local.app_plain_keys, local.cicd_plain_keys)
 }
 
 resource "azurerm_app_configuration" "this" {
-  name                    = var.name
-  location                = var.location
-  resource_group_name     = var.resource_group_name
-  sku                     = "standard"
-  public_network_access   = var.public_network_access
-  local_auth_enabled      = false
-  tags                    = var.tags
+  name                  = var.name
+  location              = var.location
+  resource_group_name   = var.resource_group_name
+  sku                   = "standard"
+  public_network_access = var.public_network_access
+  local_auth_enabled    = false
+  tags                  = var.tags
 
   identity {
     type         = "UserAssigned"

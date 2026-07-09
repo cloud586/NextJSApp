@@ -1,0 +1,161 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: workingDirectory
+    type: string
+  - name: imageRepository
+    type: string
+  - name: trunkBranch
+    type: string
+    default: main
+  - name: devAppConfigEndpoint
+    type: string
+  - name: prodAppConfigEndpoint
+    type: string
+  - name: devAzureServiceConnection
+    type: string
+    default: azure-dev-subscription
+  - name: prodAzureServiceConnection
+    type: string
+    default: azure-prod-subscription
+  - name: devAcrDockerServiceConnection
+    type: string
+    default: acr-dev
+  - name: prodAcrDockerServiceConnection
+    type: string
+    default: acr-prod
+
+variables:
+  - name: trunkBranchRef
+    value: refs/heads/${{ parameters.trunkBranch }}
+  - name: isPullRequest
+    value: $[eq(variables['Build.Reason'], 'PullRequest')]
+  - name: isReleaseTag
+    value: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  - name: isTrunkCommit
+    value: $[eq(variables['Build.SourceBranch'], variables['trunkBranchRef'])]
+  - name: targetEnvironment
+    ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/v') }}:
+      value: prod
+    ${{ elseif eq(variables['Build.SourceBranch'], format('refs/heads/{0}', parameters.trunkBranch)) }}:
+      value: dev
+    ${{ else }}:
+      value: none
+  - name: localImageTag
+    value: $(Build.BuildId)
+  - name: shortSha
+    value: $[substring(variables['Build.SourceVersion'], 0, 7)]
+  - name: devAcrDockerServiceConnection
+    value: ${{ parameters.devAcrDockerServiceConnection }}
+  - name: prodAcrDockerServiceConnection
+    value: ${{ parameters.prodAcrDockerServiceConnection }}
+  - name: buildArtifactName
+    value: ${{ parameters.serviceName }}-build
+
+stages:
+  - stage: Build
+    displayName: Build and validate
+    jobs:
+      - job: BuildValidate
+        displayName: Build, test, scan
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - template: ../tech-templates/export-app-config.yml
+            parameters:
+              azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
+              appConfigEndpoint: ${{ parameters.devAppConfigEndpoint }}
+              appConfigLabel: dev
+
+          - template: ../tech-templates/restore-npm.yml
+            parameters:
+              workingDirectory: ${{ parameters.workingDirectory }}
+
+          - template: ../tech-templates/sonar-prepare.yml
+            parameters:
+              workingDirectory: ${{ parameters.workingDirectory }}
+
+          - template: ../tech-templates/build-node.yml
+            parameters:
+              workingDirectory: ${{ parameters.workingDirectory }}
+              artifactName: $(buildArtifactName)
+
+          - template: ../tech-templates/test-vitest.yml
+            parameters:
+              workingDirectory: ${{ parameters.workingDirectory }}
+
+          - template: ../tech-templates/sonar-analyze-publish.yml
+
+          - template: ../tech-templates/docker-build-nextjs.yml
+            parameters:
+              workingDirectory: ${{ parameters.workingDirectory }}
+              imageRepository: ${{ parameters.imageRepository }}
+              localImageTag: $(localImageTag)
+
+          - template: ../tech-templates/docker-trivy-scan.yml
+            parameters:
+              imageRepository: ${{ parameters.imageRepository }}
+              localImageTag: $(localImageTag)
+
+  - stage: PublishDev
+    displayName: Publish to dev ACR
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['targetEnvironment'], 'dev'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: PushDev
+        displayName: Push image to dev ACR
+        pool:
+          vmImage: ubuntu-latest
+        environment: dev-acr
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: ../tech-templates/export-app-config.yml
+                  parameters:
+                    azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
+                    appConfigEndpoint: ${{ parameters.devAppConfigEndpoint }}
+                    appConfigLabel: dev
+
+                - template: ../tech-templates/docker-push-acr.yml
+                  parameters:
+                    acrServiceConnection: $(devAcrDockerServiceConnection)
+                    acrLoginServer: $(acr:login-server)
+                    imageRepository: ${{ parameters.imageRepository }}
+                    localImageTag: $(localImageTag)
+                    imageTags:
+                      - main-$(Build.BuildId)
+                      - main-$(shortSha)
+
+  - stage: PublishProd
+    displayName: Publish to prod ACR
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['targetEnvironment'], 'prod'))
+    jobs:
+      - deployment: PushProd
+        displayName: Push image to prod ACR
+        pool:
+          vmImage: ubuntu-latest
+        environment: prod-acr
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: ../tech-templates/export-app-config.yml
+                  parameters:
+                    azureServiceConnection: ${{ parameters.prodAzureServiceConnection }}
+                    appConfigEndpoint: ${{ parameters.prodAppConfigEndpoint }}
+                    appConfigLabel: prod
+
+                - template: ../tech-templates/docker-push-acr.yml
+                  parameters:
+                    acrServiceConnection: $(prodAcrDockerServiceConnection)
+                    acrLoginServer: $(acr:login-server)
+                    imageRepository: ${{ parameters.imageRepository }}
+                    localImageTag: $(localImageTag)
+                    imageTags:
+                      - $(Build.SourceBranchName)
+                      - $(Build.SourceBranchName)-$(Build.BuildId)

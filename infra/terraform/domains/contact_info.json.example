@@ -1,0 +1,16 @@
+{
+  "nameFirst": "Jane",
+  "nameLast": "Doe",
+  "email": "jane.doe@example.com",
+  "phone": "+1.5555550100",
+  "jobTitle": "Owner",
+  "organization": "Sutoremu",
+  "addressMailing": {
+    "address1": "123 Example St",
+    "address2": "",
+    "city": "Chicago",
+    "state": "IL",
+    "country": "US",
+    "postalCode": "60601"
+  }
+}

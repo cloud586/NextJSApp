@@ -1,0 +1,38 @@
+parameters:
+  - name: imageRepository
+    type: string
+  - name: localImageTag
+    type: string
+  - name: severity
+    type: string
+    default: CRITICAL,HIGH
+
+steps:
+  - script: |
+      set -euo pipefail
+      curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      trivy --version
+    displayName: Install Trivy
+
+  - script: |
+      set -euo pipefail
+      mkdir -p "$(Build.ArtifactStagingDirectory)/trivy"
+      trivy image \
+        --severity ${{ parameters.severity }} \
+        --exit-code 1 \
+        --format json \
+        --output "$(Build.ArtifactStagingDirectory)/trivy/report.json" \
+        "${{ parameters.imageRepository }}:${{ parameters.localImageTag }}"
+      trivy image \
+        --severity ${{ parameters.severity }} \
+        --format table \
+        "${{ parameters.imageRepository }}:${{ parameters.localImageTag }}"
+    displayName: Trivy image scan
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Trivy report
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory)/trivy
+      artifact: trivy-report
+      publishLocation: pipeline

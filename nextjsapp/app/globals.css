@@ -8,6 +8,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-sutoremu-black: #000000;
+  --color-sutoremu-offblack: #1a1a1a;
+  --color-sutoremu-white: #ffffff;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

@@ -34,18 +34,12 @@ variable "ld_client_side_id" {
   default     = ""
 }
 
-variable "cicd_principal_id" {
-  type        = string
-  description = "Optional CI/CD service principal object ID for Key Vault Secrets Officer."
-  default     = null
-}
-
 locals {
   environment = "prod"
   tags = {
-    environment  = local.environment
-    app          = "nextjsapp"
-    managed-by   = "terraform"
+    environment = local.environment
+    app         = "nextjsapp"
+    managed-by  = "terraform"
   }
   container_image = coalesce(
     var.container_image,
@@ -68,11 +62,11 @@ resource "azurerm_resource_group" "this" {
 module "monitoring" {
   source = "../../modules/monitoring"
 
-  name_prefix           = var.name_prefix
-  location              = azurerm_resource_group.this.location
-  resource_group_name   = azurerm_resource_group.this.name
-  retention_in_days     = 90
-  tags                  = local.tags
+  name_prefix         = var.name_prefix
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  retention_in_days   = 90
+  tags                = local.tags
 }
 
 resource "azurerm_user_assigned_identity" "app" {
@@ -80,6 +74,21 @@ resource "azurerm_user_assigned_identity" "app" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = local.tags
+}
+
+module "static_assets" {
+  source = "../../modules/static-assets"
+
+  name                = replace("${var.name_prefix}st", "-", "")
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = local.tags
+
+  deployer_principal_id = data.azurerm_client_config.current.object_id
+
+  upload_principal_ids = local.cicd_principal_id != null ? {
+    cicd = local.cicd_principal_id
+  } : {}
 }
 
 module "key_vault" {
@@ -94,6 +103,7 @@ module "key_vault" {
   soft_delete_retention_days    = 90
   public_network_access_enabled = true
   log_analytics_workspace_id    = module.monitoring.log_analytics_workspace_id
+  secret_names                  = ["ld-sdk-key", "nr-license-key", "sonar-token"]
 
   deployer_principal_id = data.azurerm_client_config.current.object_id
 
@@ -101,31 +111,9 @@ module "key_vault" {
     app = azurerm_user_assigned_identity.app.principal_id
   }
 
-  secrets_officer_principal_ids = var.cicd_principal_id != null ? {
-    cicd = var.cicd_principal_id
+  secrets_officer_principal_ids = local.cicd_principal_id != null ? {
+    cicd = local.cicd_principal_id
   } : {}
-}
-
-module "app_configuration" {
-  source = "../../modules/app-configuration"
-
-  name                        = replace("${var.name_prefix}-appcfg", "-", "")
-  location                    = azurerm_resource_group.this.location
-  resource_group_name         = azurerm_resource_group.this.name
-  tags                        = local.tags
-  label                       = local.environment
-  public_network_access       = "Enabled"
-  key_vault_uri               = module.key_vault.vault_uri
-  user_assigned_identity_id   = azurerm_user_assigned_identity.app.id
-  deployer_principal_id       = data.azurerm_client_config.current.object_id
-  log_analytics_workspace_id  = module.monitoring.log_analytics_workspace_id
-  ld_client_side_id           = var.ld_client_side_id
-
-  managed_identity_principal_ids = {
-    app = azurerm_user_assigned_identity.app.principal_id
-  }
-
-  depends_on = [module.key_vault]
 }
 
 module "container_registry" {
@@ -141,9 +129,35 @@ module "container_registry" {
     app = azurerm_user_assigned_identity.app.principal_id
   }
 
-  push_principal_ids = var.cicd_principal_id != null ? {
-    cicd = var.cicd_principal_id
+  push_principal_ids = local.cicd_principal_id != null ? {
+    cicd = local.cicd_principal_id
   } : {}
+}
+
+module "app_configuration" {
+  source = "../../modules/app-configuration"
+
+  name                       = replace("${var.name_prefix}-appcfg", "-", "")
+  location                   = azurerm_resource_group.this.location
+  resource_group_name        = azurerm_resource_group.this.name
+  tags                       = local.tags
+  label                      = local.environment
+  public_network_access      = "Enabled"
+  key_vault_uri              = module.key_vault.vault_uri
+  user_assigned_identity_id  = azurerm_user_assigned_identity.app.id
+  deployer_principal_id      = data.azurerm_client_config.current.object_id
+  log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
+  ld_client_side_id          = var.ld_client_side_id
+  static_assets_base_url     = module.static_assets.base_url
+  cicd_acr_login_server      = module.container_registry.login_server
+  cicd_acr_name              = module.container_registry.name
+
+  managed_identity_principal_ids = merge(
+    { app = azurerm_user_assigned_identity.app.principal_id },
+    local.cicd_principal_id != null ? { cicd = local.cicd_principal_id } : {},
+  )
+
+  depends_on = [module.key_vault]
 }
 
 module "container_apps" {
@@ -164,6 +178,7 @@ module "container_apps" {
   managed_identity_id           = azurerm_user_assigned_identity.app.id
   managed_identity_principal_id = azurerm_user_assigned_identity.app.principal_id
   managed_identity_client_id    = azurerm_user_assigned_identity.app.client_id
+  custom_domain_hostname        = "app.sutoremu.com"
 
   depends_on = [
     azurerm_resource_provider_registration.app,

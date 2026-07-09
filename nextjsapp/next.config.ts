@@ -7,6 +7,15 @@ const nrExternals = require('newrelic/load-externals');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.blob.core.windows.net',
+        pathname: '/**',
+      },
+    ],
+  },
   // New Relic is preloaded via NODE_OPTIONS at runtime; standalone file tracing
   // only copies a subset unless we explicitly include the full agent tree.
   outputFileTracingIncludes: {

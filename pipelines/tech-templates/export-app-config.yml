@@ -1,0 +1,24 @@
+# Exports cicd:* keys from Azure App Configuration into pipeline variables.
+# Uses AzureAppConfigurationExport@10 (read FROM App Config).
+# Note: AzureAppConfigurationImport@10 pushes config files TO App Config — use that
+# in an infra/sync pipeline, not here. See:
+# https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-app-configuration-export-v10
+
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: appConfigEndpoint
+    type: string
+  - name: appConfigLabel
+    type: string
+
+steps:
+  - task: AzureAppConfigurationExport@10
+    displayName: Export CI/CD config from App Configuration
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      AppConfigurationEndpoint: ${{ parameters.appConfigEndpoint }}
+      SelectionMode: Default
+      KeyFilter: 'cicd:*'
+      Label: ${{ parameters.appConfigLabel }}
+      TrimKeyPrefix: 'cicd:'

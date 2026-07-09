@@ -1,0 +1,30 @@
+# Copy to terraform.tfvars. Do not commit terraform.tfvars.
+
+location            = "centralus"
+resource_group_name = "sutoremu-dns-rg"
+domain_name         = "sutoremu.com"
+
+# Hostnames relative to domain_name → app.sutoremu.com and dev.app.sutoremu.com
+prod_hostname = "app"
+dev_hostname  = "dev.app"
+
+# --- External registrar (GoDaddy, Namecheap, etc.) ---
+register_domain = false
+
+# --- Azure App Service Domain purchase (optional) ---
+# register_domain     = true
+# auto_renew          = true
+# privacy             = true
+# contact_info_file   = "contact_info.json"
+# consent_agreed_by   = "203.0.113.10"  # your public IP at apply time
+
+# Remote state for dev/prod Container App FQDNs (match bootstrap / environment backend.hcl)
+state_resource_group_name  = "nextjsapp-tfstate-rg"
+state_storage_account_name = "nextjsapptfstate"
+state_container_name       = "tfstate"
+dev_state_key              = "nextjsapp-dev.tfstate"
+prod_state_key             = "nextjsapp-prod.tfstate"
+
+# Optional overrides when an environment is not yet in remote state:
+# prod_container_app_fqdn = "nextjsapp-prod-app.example.centralus.azurecontainerapps.io"
+# dev_container_app_fqdn  = "nextjsapp-dev-app.example.centralus.azurecontainerapps.io"

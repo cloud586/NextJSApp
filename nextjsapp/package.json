@@ -17,6 +17,7 @@
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
     "test:coverage": "vitest run --coverage",
+    "upload-assets": "node scripts/upload-static-assets.mjs",
     "dev:coverage": "cross-env CYPRESS=true next dev --webpack -p 3001",
     "cy:open": "cypress open --config baseUrl=http://localhost:3001",
     "cy:run": "cypress run --config baseUrl=http://localhost:3001",

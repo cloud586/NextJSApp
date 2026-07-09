@@ -21,6 +21,7 @@ const APP_CONFIG_TO_ENV = {
   "app:logging:server-level": "LOG_LEVEL",
   "app:logging:client-level": "CLIENT_LOG_LEVEL",
   "app:ld:client-side-id": "LD_CLIENT_SIDE_ID",
+  "app:assets:base-url": "NEXT_PUBLIC_ASSETS_BASE_URL",
 };
 
 const CONFIG_REFRESH_INTERVAL_MS = 300_000;

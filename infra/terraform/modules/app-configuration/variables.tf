@@ -79,3 +79,30 @@ variable "ld_client_side_id" {
   description = "LaunchDarkly client-side ID (non-secret, public LD identifier)."
   default     = ""
 }
+
+variable "static_assets_base_url" {
+  type        = string
+  description = "Public base URL for static assets served from Azure Blob Storage."
+}
+
+variable "cicd_acr_login_server" {
+  type        = string
+  description = "ACR login server for CI/CD pipelines (cicd:acr:login-server)."
+}
+
+variable "cicd_acr_name" {
+  type        = string
+  description = "ACR name for CI/CD pipelines (cicd:acr:name)."
+}
+
+variable "cicd_sonar_organization" {
+  type        = string
+  description = "SonarCloud organization key (cicd:sonar:organization)."
+  default     = "sutoremu"
+}
+
+variable "cicd_sonar_project_key" {
+  type        = string
+  description = "SonarCloud project key (cicd:sonar:project-key)."
+  default     = "nextjsapp"
+}

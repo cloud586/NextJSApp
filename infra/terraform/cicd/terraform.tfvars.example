@@ -1,0 +1,10 @@
+# Optional: add federated_credentials for workload identity federation (no client secret).
+# display_name = "sutoremu-nextjsapp-cicd"
+
+# federated_credentials = [
+#   {
+#     display_name = "ado-azure-dev-subscription"
+#     issuer       = "https://vstmr.dev.azure.com/<azure-devops-tenant-id>"
+#     subject      = "sc://SephieBox/sutoremu/azure-dev-subscription"
+#   },
+# ]
