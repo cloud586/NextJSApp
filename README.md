@@ -144,8 +144,13 @@ Parent entrypoint: [`pipelines/nextjs-app.yml`](pipelines/nextjs-app.yml). Full 
 | APP-0006 | Azure App Configuration, Key Vault, Terraform deploy to Container Apps |
 | APP-0007 | Marketing UI, domains/DNS, static assets, trunk-based ADO pipelines + Sonar |
 
+## License
+
+Proprietary — **All Rights Reserved**. See [LICENSE](LICENSE). Public visibility of this repository does not grant permission to use, copy, modify, or distribute the software.
+
 ## Quick links
 
 - [PR notes — APP-0007](docs/PR-APP-0007.md)
+- [PR notes — LICENSE](docs/PR-LICENSE.md)
 - [Sonar project properties](nextjsapp/sonar-project.properties)
 - Env template: [nextjsapp/.env.example](nextjsapp/.env.example)
