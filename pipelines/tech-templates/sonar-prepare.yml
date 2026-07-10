@@ -20,3 +20,4 @@ steps:
         sonar.login=$(sonar:token)
         sonar.organization=$(sonar:organization)
         sonar.projectKey=$(sonar:project-key)
+        sonar.projectBaseDir=$(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
