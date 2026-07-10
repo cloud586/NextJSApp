@@ -41,8 +41,15 @@ data "terraform_remote_state" "cicd" {
 }
 
 locals {
-  cicd_principal_id = coalesce(
+  cicd_principal_id_raw = coalesce(
     var.cicd_principal_id,
     try(data.terraform_remote_state.cicd[0].outputs.principal_id, null),
+  )
+
+  # azuread v3+ may expose principal IDs as /servicePrincipals/{guid}; RBAC needs the GUID.
+  cicd_principal_id = local.cicd_principal_id_raw == null ? null : replace(
+    local.cicd_principal_id_raw,
+    "/servicePrincipals/",
+    "",
   )
 }

@@ -1,17 +1,18 @@
 parameters:
   - name: workingDirectory
     type: string
-  - name: sonarQubeServiceConnection
+  - name: sonarCloudServiceConnection
     type: string
     default: sonarcloud-sutoremu
 
 steps:
-  - task: SonarQubePrepare@6
-    displayName: SonarQube prepare
+  - task: SonarCloudPrepare@4
+    displayName: SonarCloud prepare
     env:
       SONAR_TOKEN: $(sonar:token)
     inputs:
-      SonarQube: ${{ parameters.sonarQubeServiceConnection }}
+      SonarCloud: ${{ parameters.sonarCloudServiceConnection }}
+      organization: $(sonar:organization)
       scannerMode: CLI
       configMode: file
       configFile: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}/sonar-project.properties
@@ -19,4 +20,3 @@ steps:
         sonar.login=$(sonar:token)
         sonar.organization=$(sonar:organization)
         sonar.projectKey=$(sonar:project-key)
-        sonar.host.url=https://sonarcloud.io

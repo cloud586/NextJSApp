@@ -1,12 +1,12 @@
 steps:
-  - task: SonarQubeAnalyze@6
-    displayName: SonarQube analyze
+  - task: SonarCloudAnalyze@4
+    displayName: SonarCloud analyze
     env:
       SONAR_TOKEN: $(sonar:token)
     inputs:
       jdkversion: JAVA_HOME_17_X64
 
-  - task: SonarQubePublish@6
-    displayName: SonarQube publish quality gate
+  - task: SonarCloudPublish@4
+    displayName: SonarCloud publish quality gate
     inputs:
       pollingTimeoutSec: 300

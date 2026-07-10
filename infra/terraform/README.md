@@ -147,10 +147,20 @@ The base URL is written to App Configuration as `app:assets:base-url` and loaded
 
 ## Seed secrets (out of band)
 
+Run from the environment directory you are seeding (e.g. `infra/terraform/environments/dev`):
+
 ```powershell
+cd infra/terraform/environments/dev   # or prod
 $kv = terraform output -raw key_vault_name
 az keyvault secret set --vault-name $kv --name ld-sdk-key --value "<LaunchDarkly SDK key>"
 az keyvault secret set --vault-name $kv --name nr-license-key --value "<New Relic license key>"
+az keyvault secret set --vault-name $kv --name sonar-token --value "<SonarCloud token>"
+```
+
+From the repository root instead, use `-chdir`:
+
+```powershell
+$kv = terraform -chdir=infra/terraform/environments/dev output -raw key_vault_name
 az keyvault secret set --vault-name $kv --name sonar-token --value "<SonarCloud token>"
 ```
 
