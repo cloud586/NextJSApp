@@ -1,4 +1,5 @@
-node_modules
+# node_modules must stay in the build context — Dockerfile.runtime copies it
+# for scripts/sync-newrelic-standalone.mjs (New Relic + Azure App Config deps).
 .git
 .github
 .next/cache
