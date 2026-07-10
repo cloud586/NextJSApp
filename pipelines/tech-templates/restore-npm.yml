@@ -32,9 +32,11 @@ steps:
   - task: Cache@2
     displayName: Cache npm packages
     inputs:
-      key: 'npm | "$(Agent.OS)" | ${{ parameters.npmVersion }} | ${{ parameters.workingDirectory }}/package-lock.json'
+      # Quote npmVersion so Cache@2 treats it as a string, not a file path
+      # (unquoted "11.12.1" is resolved as a missing file and fails the job).
+      key: 'npm | "$(Agent.OS)" | "${{ parameters.npmVersion }}" | ${{ parameters.workingDirectory }}/package-lock.json'
       restoreKeys: |
-        npm | "$(Agent.OS)" | ${{ parameters.npmVersion }}
+        npm | "$(Agent.OS)" | "${{ parameters.npmVersion }}"
         npm | "$(Agent.OS)"
       path: $(HOME)/.npm
 
