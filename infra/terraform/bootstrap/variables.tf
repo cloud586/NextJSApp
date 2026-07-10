@@ -1,7 +1,7 @@
 variable "location" {
   type        = string
   description = "Azure region for Terraform state resources."
-  default     = "centralus"
+  default     = "eastus"
 }
 
 variable "resource_group_name" {

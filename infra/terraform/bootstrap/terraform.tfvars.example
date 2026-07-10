@@ -1,2 +1,4 @@
+location = "eastus"
+
 # Globally unique storage account name (lowercase alphanumeric, 3-24 chars).
 storage_account_name = "nextjsapptfstate"

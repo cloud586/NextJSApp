@@ -9,7 +9,7 @@ output "client_id" {
 }
 
 output "principal_id" {
-  value       = azuread_service_principal.cicd.id
+  value       = azuread_service_principal.cicd.object_id
   description = "Service principal object ID for Azure RBAC (cicd_principal_id)."
 }
 

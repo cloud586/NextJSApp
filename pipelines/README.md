@@ -66,7 +66,7 @@ After export, pipeline variables are named:
 2. **Restore** — `npm ci` with npm cache
 3. **Build** — `npm run lint`, `npm run build`
 4. **Test** — `npm run test:coverage` (Vitest unit + component)
-5. **SonarQube** — [`SonarQubePrepare@6`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/sonar-qube-prepare-v6) → build → test → [`SonarQubeAnalyze@6`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/sonar-qube-analyze-v6) → [`SonarQubePublish@6`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/sonar-qube-publish-v6)
+5. **SonarQube Cloud** — [`SonarCloudPrepare@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks) → build → test → [`SonarCloudAnalyze@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks) → [`SonarCloudPublish@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks)
 6. **Docker build** — [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) `build` for `Dockerfile.base` + `Dockerfile.runtime`; save image artifact
 7. **Trivy scan** — fail on CRITICAL/HIGH vulnerabilities
 8. **Publish** (conditional) — [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) `login` + `push` to dev or prod ACR
@@ -88,9 +88,16 @@ After export, pipeline variables are named:
 2. Under **Repositories**, choose **GitHub** and authorize the Azure Pipelines GitHub App (or OAuth) for your GitHub account/org.
 3. Select the GitHub repository you are already using for this project and connect it to the ADO project.
 
-### 2. Install the Azure App Configuration extension
+### 2. Install marketplace extensions
 
-Install the [Azure App Configuration](https://marketplace.visualstudio.com/items?itemName=AzureAppConfiguration.azure-app-configuration-tasks) DevOps extension in your organization. This provides `AzureAppConfigurationExport@10` and `AzureAppConfigurationImport@10`.
+Install these DevOps extensions in your organization:
+
+| Extension | Marketplace | Provides |
+|-----------|-------------|---------|
+| [Azure App Configuration](https://marketplace.visualstudio.com/items?itemName=AzureAppConfiguration.azure-app-configuration-tasks) | `AzureAppConfiguration.azure-app-configuration-tasks` | `AzureAppConfigurationExport@10`, `AzureAppConfigurationImport@10` |
+| [SonarQube Cloud](https://marketplace.visualstudio.com/items?itemName=SonarSource.sonarcloud) | `SonarSource.sonarcloud` | `SonarCloudPrepare@4`, `SonarCloudAnalyze@4`, `SonarCloudPublish@4` |
+
+> Use the **SonarQube Cloud** extension (`SonarSource.sonarcloud`), not the older **SonarQube Server** extension (`SonarSource.sonarqube`). The Server tasks (`SonarQubePrepare@6`, etc.) are a different product and will fail with "task is missing" if only Cloud is installed.
 
 ### 3. Register the pipeline
 
@@ -112,7 +119,7 @@ Create under **Project settings → Service connections**:
 | `azure-prod-subscription` | Azure Resource Manager | Read prod App Config |
 | `acr-dev` | Docker Registry | `Docker@2` login/push to dev ACR |
 | `acr-prod` | Docker Registry | `Docker@2` login/push to prod ACR |
-| `sonarcloud-sutoremu` | SonarQube | SonarCloud endpoint (`https://sonarcloud.io`) |
+| `sonarcloud-sutoremu` | SonarCloud | SonarQube Cloud service connection |
 
 **Azure connections:** workload identity federation or service principal; needs **App Configuration Data Reader** on each store and **AcrPush** on ACR.
 
@@ -126,7 +133,7 @@ Create under **Project settings → Service connections**:
 
 Name them `acr-dev` and `acr-prod` (or map to the `acrServiceConnection` parameter in the pipeline template).
 
-**SonarQube connection:** Create a [SonarQube service connection](https://docs.sonarsource.com/sonarqube/latest/analyzing-source-code/scanners/sonarqube-extension-for-azure-devops/) pointing to `https://sonarcloud.io`. The API token is loaded at runtime from App Configuration (`sonar:token` via Key Vault ref) and passed through `sonar.login` in `SonarQubePrepare@6` `extraProperties` — the service connection is required by the task but the token value comes from Azure, not ADO variable groups.
+**SonarCloud connection:** Create a [SonarCloud service connection](https://docs.sonarsource.com/sonarqube-cloud/devops-platform-integration/azure-devops/adding-sonarqube-cloud-service-connection) (type **SonarCloud**, from the SonarQube Cloud extension). The API token is loaded at runtime from App Configuration (`sonar:token` via Key Vault ref) and passed through `sonar.login` in `SonarCloudPrepare@4` `extraProperties` — the service connection is required by the task but the token value comes from Azure, not ADO variable groups.
 
 ### 5. Terraform — CI/CD principal and config keys
 
@@ -141,6 +148,8 @@ terraform -chdir=infra/terraform/environments/prod output -raw app_configuration
 
 ### 6. Seed secrets
 
+Run from the **repository root** (`NextJSApp/`):
+
 ```powershell
 # Dev
 $kv = terraform -chdir=infra/terraform/environments/dev output -raw key_vault_name
@@ -148,6 +157,14 @@ az keyvault secret set --vault-name $kv --name sonar-token --value "<SonarCloud 
 
 # Prod (same token or a dedicated prod token)
 $kv = terraform -chdir=infra/terraform/environments/prod output -raw key_vault_name
+az keyvault secret set --vault-name $kv --name sonar-token --value "<SonarCloud token>"
+```
+
+If you are already inside an environment directory (e.g. `infra/terraform/environments/dev`), omit `-chdir` and use `terraform output` there instead:
+
+```powershell
+cd infra/terraform/environments/dev
+$kv = terraform output -raw key_vault_name
 az keyvault secret set --vault-name $kv --name sonar-token --value "<SonarCloud token>"
 ```
 
