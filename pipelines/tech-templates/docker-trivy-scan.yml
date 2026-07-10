@@ -17,14 +17,16 @@ steps:
   - script: |
       set -euo pipefail
       mkdir -p "$(Build.ArtifactStagingDirectory)/trivy"
+      # Write JSON report first (always), then print table and fail on CRITICAL/HIGH
       trivy image \
         --severity ${{ parameters.severity }} \
-        --exit-code 1 \
+        --exit-code 0 \
         --format json \
         --output "$(Build.ArtifactStagingDirectory)/trivy/report.json" \
         "${{ parameters.imageRepository }}:${{ parameters.localImageTag }}"
       trivy image \
         --severity ${{ parameters.severity }} \
+        --exit-code 1 \
         --format table \
         "${{ parameters.imageRepository }}:${{ parameters.localImageTag }}"
     displayName: Trivy image scan
