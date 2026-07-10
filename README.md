@@ -9,7 +9,7 @@ Next.js marketing/app foundation for **Sutoremu**, with LaunchDarkly feature fla
 | Observability | Pino/loglevel + correlation IDs; New Relic APM (prod/Docker) |
 | Config & secrets | Azure App Configuration + Key Vault refs at container start |
 | Containers | Multi-stage Docker (`Dockerfile.base` + `Dockerfile.runtime`), standalone Next build |
-| Infra | Terraform: ACR, Container Apps, KV, App Config, static assets, DNS, CI/CD SP |
+| Infra | Terraform: ACR, Container Apps, KV, App Config, static assets, DNS, CI/CD SP, ADO service connections |
 | CI/CD | Azure DevOps → GitHub; lint/build/test/Sonar/Docker/Trivy; ACR publish on trunk/tags |
 | Tests | Vitest (unit + component + coverage), Cypress e2e (+ optional coverage) |
 
@@ -124,7 +124,7 @@ Azure DevOps project [sutoremu](https://dev.azure.com/SephieBox/sutoremu) builds
 | Merge to `main` | yes | dev ACR |
 | Tag `v*` on trunk | yes | prod ACR |
 
-Parent entrypoint: [`pipelines/nextjs-app.yml`](pipelines/nextjs-app.yml). Full setup (extensions, service connections, environments): [pipelines/README.md](pipelines/README.md).
+Parent entrypoint: [`pipelines/nextjs-app.yml`](pipelines/nextjs-app.yml). Full setup (extensions, Terraform-managed service connections/environments): [pipelines/README.md](pipelines/README.md). Apply order for connections: [infra/terraform/README.md](infra/terraform/README.md) (cicd → dev → ado).
 
 ### Out of scope (follow-up)
 

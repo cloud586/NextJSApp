@@ -2,6 +2,11 @@ output "resource_group_name" {
   value = azurerm_resource_group.this.name
 }
 
+output "subscription_id" {
+  value       = data.azurerm_client_config.current.subscription_id
+  description = "Azure subscription ID (for future ado stack prod re-pointing)."
+}
+
 output "key_vault_name" {
   value = module.key_vault.name
 }

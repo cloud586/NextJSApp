@@ -32,6 +32,7 @@ bootstrap-config.mjs (on container start)
 infra/terraform/
   bootstrap/              # One-time: remote state storage (local state)
   cicd/                   # CI/CD service principal for Azure DevOps (separate state)
+  ado/                    # Azure DevOps service connections + environments (separate state)
   domains/                # Shared: Azure DNS zone + app/dev CNAMEs (optional domain purchase)
   launchdarkly/           # LaunchDarkly feature flags (separate state)
   modules/
@@ -92,7 +93,7 @@ terraform init -backend-config=backend.hcl
 terraform apply
 ```
 
-Retrieve credentials for Azure DevOps service connections:
+Outputs used by the **ado** stack (and for debugging):
 
 ```powershell
 terraform output -raw client_id
@@ -101,11 +102,37 @@ terraform output -raw tenant_id
 terraform output -raw principal_id
 ```
 
-Use `client_id` + `client_secret` when creating **Docker Registry** service connections (`acr-dev`, `acr-prod`) and **Azure Resource Manager** connections in Azure DevOps. The secret is sensitive — store it in a password manager; rotate by tainting `azuread_service_principal_password.cicd` and re-applying.
+The client secret is still required for **Docker Registry** service connections (`acr-dev`, `acr-prod`) created by the ado stack. ARM connections use **workload identity federation** (federated credentials are created automatically by the ado stack). Rotate the secret by tainting `azuread_service_principal_password.cicd` and re-applying cicd, then re-applying ado.
 
-Optional: configure **workload identity federation** instead of a client secret by setting `federated_credentials` in `terraform.tfvars` (see `terraform.tfvars.example`).
+**Apply order:** bootstrap → **cicd** → **dev** → **ado** (prod env optional while prod Azure is spooled down).
 
-**Apply order:** bootstrap → **cicd** → dev/prod environments.
+## Step 2c — Azure DevOps service connections
+
+Creates the service connections and environments expected by [`pipelines/nextjs-app.yml`](../../pipelines/nextjs-app.yml) in project [SephieBox/sutoremu](https://dev.azure.com/SephieBox/sutoremu). Does **not** create the ADO org or project — those are looked up.
+
+| Name | Type | Azure target (current) |
+|------|------|------------------------|
+| `azure-dev-subscription` | ARM (WIF) | Dev subscription |
+| `azure-prod-subscription` | ARM (WIF) | **Same as dev** (cost alias) |
+| `acr-dev` | Docker Registry | Dev ACR |
+| `acr-prod` | Docker Registry | **Same as** dev ACR (cost alias) |
+| `sonarcloud-sutoremu` | SonarCloud | SonarQube Cloud |
+| `dev-acr` / `prod-acr` | Environments | Pipeline deployment environments |
+
+Prerequisites: cicd + **dev** applied (so remote state has `client_id` / `client_secret` and `subscription_id` / `acr_login_server`). If `subscription_id` is missing from dev outputs, re-apply or refresh the dev stack first.
+
+```powershell
+cd infra/terraform/ado
+cp backend.hcl.example backend.hcl
+cp terraform.tfvars.example terraform.tfvars
+# Set sonarcloud_token (or $env:TF_VAR_sonarcloud_token)
+# Set $env:AZDO_PERSONAL_ACCESS_TOKEN to a PAT that can manage service connections + environments
+
+terraform init -backend-config=backend.hcl
+terraform apply
+```
+
+When you stand prod Azure back up, re-point the two prod-named connections at prod subscription/ACR (and add prod remote state) without renaming pipeline parameters.
 
 ## Step 3 — Deploy an environment
 
