@@ -109,41 +109,33 @@ Install these DevOps extensions in your organization:
 
 Triggers and PR validation use GitHub events (`push` to `main`, `v*` tags, PRs targeting `main`) via the ADO GitHub integration.
 
-### 4. Service connections
+### 4. Service connections (Terraform)
 
-Create under **Project settings → Service connections**:
+Apply the [`infra/terraform/ado`](../../infra/terraform/ado) stack after **cicd** + **dev**. It creates and authorizes:
 
-| Name | Type | Purpose |
-|------|------|---------|
-| `azure-dev-subscription` | Azure Resource Manager | Read dev App Config |
-| `azure-prod-subscription` | Azure Resource Manager | Read prod App Config |
-| `acr-dev` | Docker Registry | `Docker@2` login/push to dev ACR |
-| `acr-prod` | Docker Registry | `Docker@2` login/push to prod ACR |
-| `sonarcloud-sutoremu` | SonarCloud | SonarQube Cloud service connection |
+| Name | Type | Purpose | Azure target (current) |
+|------|------|---------|------------------------|
+| `azure-dev-subscription` | Azure Resource Manager (WIF) | Read App Config | Dev subscription |
+| `azure-prod-subscription` | Azure Resource Manager (WIF) | Read App Config | **Same as dev** (prod spooled down) |
+| `acr-dev` | Docker Registry | `Docker@2` login/push | Dev ACR |
+| `acr-prod` | Docker Registry | `Docker@2` login/push | **Same as** dev ACR |
+| `sonarcloud-sutoremu` | SonarCloud | SonarQube Cloud tasks | SonarQube Cloud |
 
-**Azure connections:** workload identity federation or service principal; needs **App Configuration Data Reader** on each store and **AcrPush** on ACR.
+See [Terraform README — Step 2c](../../infra/terraform/README.md#step-2c--azure-devops-service-connections). Requires `AZDO_PERSONAL_ACCESS_TOKEN` and `sonarcloud_token` / `TF_VAR_sonarcloud_token`.
 
-[`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) requires a **Docker Registry** service connection (not ARM). Create one per ACR using your SPN credentials — see [Microsoft docs](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2#dockerV2-only-supports-docker-registry-service-connection-and-not-support-arm-service-connection-how-can-i-use-an-existing-azure-service-principal-spn-for-authentication-in-docker-task):
+[`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) uses the Docker Registry connections (not ARM). Credentials come from the cicd stack SP (`client_id` / `client_secret`).
 
-| Field | Value |
-|-------|-------|
-| Docker Registry | `https://<acr-name>.azurecr.io` |
-| Docker ID | `terraform output -raw client_id` (cicd stack) |
-| Password | `terraform output -raw client_secret` (cicd stack) |
+**SonarCloud:** The service connection token is set in the ado stack. At runtime the pipeline still loads `sonar:token` from App Configuration (Key Vault ref) and passes it via `sonar.login` in `SonarCloudPrepare@4` `extraProperties`.
 
-Name them `acr-dev` and `acr-prod` (or map to the `acrServiceConnection` parameter in the pipeline template).
+### 5. Terraform — CI/CD principal, RBAC, and config keys
 
-**SonarCloud connection:** Create a [SonarCloud service connection](https://docs.sonarsource.com/sonarqube-cloud/devops-platform-integration/azure-devops/adding-sonarqube-cloud-service-connection) (type **SonarCloud**, from the SonarQube Cloud extension). The API token is loaded at runtime from App Configuration (`sonar:token` via Key Vault ref) and passed through `sonar.login` in `SonarCloudPrepare@4` `extraProperties` — the service connection is required by the task but the token value comes from Azure, not ADO variable groups.
-
-### 5. Terraform — CI/CD principal and config keys
-
-1. Apply the [`infra/terraform/cicd`](../../infra/terraform/cicd) stack (creates the service principal — see [Terraform README](../../infra/terraform/README.md#step-2b--cicd-service-principal-one-time))
-2. `terraform apply` dev and prod — RBAC is granted automatically via remote state `principal_id`
-3. Verify endpoints match the parent pipeline:
+1. Apply [`infra/terraform/cicd`](../../infra/terraform/cicd) (service principal)
+2. Apply [`infra/terraform/environments/dev`](../../infra/terraform/environments/dev) — RBAC via remote state `principal_id`
+3. Apply [`infra/terraform/ado`](../../infra/terraform/ado) — service connections + environments
+4. Verify the App Config endpoint matches the parent pipeline:
 
 ```powershell
 terraform -chdir=infra/terraform/environments/dev output -raw app_configuration_endpoint
-terraform -chdir=infra/terraform/environments/prod output -raw app_configuration_endpoint
 ```
 
 ### 6. Seed secrets
@@ -172,10 +164,12 @@ SonarCloud organization and project key are set by Terraform (`cicd:sonar:organi
 
 ### 7. Environments
 
+Created by the ado Terraform stack (authorized for all pipelines):
+
 | Environment | Approval | Used by |
 |-------------|----------|---------|
 | `dev-acr` | none | PublishDev stage |
-| `prod-acr` | optional manual approval | PublishProd stage |
+| `prod-acr` | none by default (add manual approval in ADO if desired) | PublishProd stage |
 
 ### 8. Branch protection on `main` (GitHub)
 

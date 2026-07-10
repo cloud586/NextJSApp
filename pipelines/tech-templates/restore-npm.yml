@@ -1,18 +1,40 @@
 parameters:
   - name: workingDirectory
     type: string
+  - name: nodeVersion
+    type: string
+    default: '22.x'
+  - name: npmVersion
+    type: string
+    # Pin npm so lockfile validation matches how package-lock.json was generated.
+    # Node 22's bundled npm can disagree on optional peer deps (e.g. @swc/helpers).
+    default: '11.12.1'
 
 steps:
-  - task: NodeTool@0
-    displayName: Use Node.js 22.x
+  # UseNode@1 replaces deprecated NodeTool@0 on Microsoft-hosted agents.
+  - task: UseNode@1
+    displayName: Use Node.js ${{ parameters.nodeVersion }}
     inputs:
-      versionSpec: '22.x'
+      version: ${{ parameters.nodeVersion }}
+
+  # In-place npm upgrade on the hosted agent so `npm ci` uses a consistent
+  # lockfile algorithm (peer optional deps such as @swc/helpers).
+  - script: |
+      set -euo pipefail
+      echo "Node before: $(node -v)"
+      echo "npm before:  $(npm -v)"
+      npm install -g npm@${{ parameters.npmVersion }}
+      echo "Node after:  $(node -v)"
+      echo "npm after:   $(npm -v)"
+      node -e "const [maj]=process.versions.node.split('.').map(Number); if (maj < 22) { console.error('Node >= 22 required'); process.exit(1); }"
+    displayName: Upgrade npm on agent (in-place)
 
   - task: Cache@2
     displayName: Cache npm packages
     inputs:
-      key: 'npm | "$(Agent.OS)" | ${{ parameters.workingDirectory }}/package-lock.json'
+      key: 'npm | "$(Agent.OS)" | ${{ parameters.npmVersion }} | ${{ parameters.workingDirectory }}/package-lock.json'
       restoreKeys: |
+        npm | "$(Agent.OS)" | ${{ parameters.npmVersion }}
         npm | "$(Agent.OS)"
       path: $(HOME)/.npm
 

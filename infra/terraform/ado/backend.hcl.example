@@ -1,0 +1,5 @@
+resource_group_name  = "nextjsapp-tfstate-rg"
+storage_account_name = "nextjsapptfstate"
+container_name       = "tfstate"
+key                  = "nextjsapp-ado.tfstate"
+use_azuread_auth     = true

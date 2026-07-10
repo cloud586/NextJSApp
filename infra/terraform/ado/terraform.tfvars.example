@@ -1,0 +1,13 @@
+# org_service_url = "https://dev.azure.com/SephieBox"
+# project_name    = "sutoremu"
+
+# Required: SonarQube Cloud user token (same value you seed into Key Vault as sonar-token).
+# Prefer env var instead of committing secrets:
+#   $env:TF_VAR_sonarcloud_token = "<token>"
+#   # or
+#   $env:AZDO_PERSONAL_ACCESS_TOKEN = "<ado-pat>"   # provider auth
+sonarcloud_token = "replace-me"
+
+# Auth for the azuredevops provider (do not commit):
+#   $env:AZDO_PERSONAL_ACCESS_TOKEN = "<pat-with-service-connection-and-environment-manage>"
+#   $env:AZDO_ORG_SERVICE_URL       = "https://dev.azure.com/SephieBox"   # optional; defaults in provider

@@ -11,9 +11,9 @@ variable "federated_credentials" {
     subject      = string
   }))
   description = <<-EOT
-    Optional workload identity federation for Azure DevOps service connections.
-    Example subject: sc://SephieBox/sutoremu/azure-dev-subscription
-    Example issuer:  https://vstmr.dev.azure.com/<azure-devops-tenant-id>
+    Optional extra workload identity federation credentials on the cicd app.
+    Pipeline ARM connections (azure-dev-subscription / azure-prod-subscription) are
+    federated automatically by the ado stack — leave this empty unless you need more.
   EOT
   default     = []
 }
