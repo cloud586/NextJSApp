@@ -22,3 +22,18 @@ steps:
       KeyFilter: 'cicd:*'
       Label: ${{ parameters.appConfigLabel }}
       TrimKeyPrefix: 'cicd:'
+
+  # App Config yields names like acr:login-server. Colons break $(var) expansion in bash
+  # (treated as command substitution → empty registry → "invalid reference format").
+  # Map to a colon-free alias for Docker tag/push/pull steps.
+  - bash: |
+      set -euo pipefail
+      if [ -z "${ACR_LOGIN_SERVER:-}" ]; then
+        echo "##vso[task.logissue type=error]acr:login-server is empty after App Configuration export"
+        exit 1
+      fi
+      echo "ACR login server: ${ACR_LOGIN_SERVER}"
+      echo "##vso[task.setvariable variable=acrLoginServer]${ACR_LOGIN_SERVER}"
+    displayName: Map ACR login server to safe variable
+    env:
+      ACR_LOGIN_SERVER: $(acr:login-server)

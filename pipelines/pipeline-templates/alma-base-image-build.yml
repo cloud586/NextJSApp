@@ -83,7 +83,7 @@ stages:
                 - template: ../tech-templates/docker-push-acr.yml
                   parameters:
                     acrServiceConnection: $(devAcrDockerServiceConnection)
-                    acrLoginServer: $(acr:login-server)
+                    acrLoginServer: $(acrLoginServer)
                     imageRepository: ${{ parameters.imageRepository }}
                     localImageTag: $(localImageTag)
                     imageTags:
