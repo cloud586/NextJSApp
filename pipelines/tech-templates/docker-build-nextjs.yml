@@ -50,6 +50,19 @@ steps:
       command: logout
       containerRegistry: ${{ parameters.acrServiceConnection }}
 
+  # Drop vite/esbuild and other gobinary-heavy dev tooling from the build
+  # context. Runtime image only needs production deps for New Relic sync.
+  - bash: |
+      set -euo pipefail
+      npm prune --omit=dev
+      if [ -d node_modules/esbuild ] || [ -d node_modules/@esbuild ]; then
+        echo "##vso[task.logissue type=error]esbuild still present after npm prune --omit=dev"
+        exit 1
+      fi
+      echo "Dev dependencies pruned; esbuild not present in build context"
+    displayName: Prune devDependencies before Docker build
+    workingDirectory: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
+
   - task: Docker@2
     displayName: Build runtime image (Dockerfile.runtime)
     inputs:
