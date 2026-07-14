@@ -52,11 +52,14 @@ steps:
 
   # Drop vite/esbuild and other gobinary-heavy dev tooling from the build
   # context. Runtime image only needs production deps for New Relic sync.
+  # npm prune removes the esbuild package but can leave orphaned @esbuild/*
+  # platform binaries; delete those explicitly so Trivy/Aqua do not scan them.
   - bash: |
       set -euo pipefail
       npm prune --omit=dev
+      rm -rf node_modules/esbuild node_modules/@esbuild
       if [ -d node_modules/esbuild ] || [ -d node_modules/@esbuild ]; then
-        echo "##vso[task.logissue type=error]esbuild still present after npm prune --omit=dev"
+        echo "##vso[task.logissue type=error]esbuild still present after prune cleanup"
         exit 1
       fi
       echo "Dev dependencies pruned; esbuild not present in build context"
