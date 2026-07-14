@@ -8,9 +8,9 @@ Next.js marketing/app foundation for **Sutoremu**, with LaunchDarkly feature fla
 | Feature flags | LaunchDarkly (server + client), Terraform-managed flag keys |
 | Observability | Pino/loglevel + correlation IDs; New Relic APM (prod/Docker) |
 | Config & secrets | Azure App Configuration + Key Vault refs at container start |
-| Containers | Multi-stage Docker (`Dockerfile.base` + `Dockerfile.runtime`), standalone Next build |
+| Containers | Alma base image (`base-images/alma-ubi`) + app `Dockerfile.runtime`, standalone Next build |
 | Infra | Terraform: ACR, Container Apps, KV, App Config, static assets, DNS, CI/CD SP, ADO service connections |
-| CI/CD | Azure DevOps → GitHub; lint/build/test/Sonar/Docker/Trivy; ACR publish on trunk/tags |
+| CI/CD | Azure DevOps → GitHub; alma-base-image + nextjs-app; lint/build/test/Sonar/Docker/Trivy; ACR publish on trunk/tags |
 | Tests | Vitest (unit + component + coverage), Cypress e2e (+ optional coverage) |
 
 ## Repository layout
@@ -18,6 +18,7 @@ Next.js marketing/app foundation for **Sutoremu**, with LaunchDarkly feature fla
 ```
 NextJSApp/
   nextjsapp/          # Next.js application
+  base-images/        # Shared container base images (alma-ubi)
   infra/terraform/    # Azure + LaunchDarkly infrastructure
   pipelines/          # Azure DevOps build pipelines
   docs/               # PR / delivery notes
@@ -82,8 +83,9 @@ Open [http://localhost:3000](http://localhost:3000).
 ### Docker
 
 ```powershell
+# From repo root — build base locally, or pull alma-ubi:latest from ACR after the base pipeline has published
+docker build -f base-images/alma-ubi/Dockerfile -t alma-ubi:latest base-images/alma-ubi
 cd nextjsapp
-docker build -f Dockerfile.base -t alma-ubi:latest .
 docker build -f Dockerfile.runtime -t nextjsapp:local .
 ```
 
@@ -116,15 +118,15 @@ See [infra/terraform/README.md](infra/terraform/README.md) for backends, seeding
 
 Azure DevOps project [sutoremu](https://dev.azure.com/SephieBox/sutoremu) builds from this GitHub repo. CI settings are loaded at runtime from **Azure App Configuration** (`cicd:*` keys, including Key Vault refs) — no ADO variable groups.
 
-**Flow:** export App Config → restore → Sonar prepare → lint/build → Vitest coverage → Sonar analyze/publish → Docker build → Trivy → conditional ACR push.
+**Flow:** Alma base (`alma-base-image`) publishes `alma-ubi:latest` to ACR. App pipeline (`nextjs-app`): export App Config → restore → Sonar prepare → lint/build → Vitest coverage → Sonar analyze/publish → pull base + Docker runtime build → Trivy → conditional ACR push.
 
 | Event | Validate | Publish |
 |-------|----------|---------|
 | PR → `main` | yes | no |
-| Merge to `main` | yes | dev ACR |
-| Tag `v*` on trunk | yes | prod ACR |
+| Merge to `main` | yes | ACR (`alma-ubi:latest` and/or app tags) |
+| Tag `v*` on trunk | yes (app) | prod ACR (app) |
 
-Parent entrypoint: [`pipelines/nextjs-app.yml`](pipelines/nextjs-app.yml). Full setup (extensions, Terraform-managed service connections/environments): [pipelines/README.md](pipelines/README.md). Apply order for connections: [infra/terraform/README.md](infra/terraform/README.md) (cicd → dev → ado).
+Entrypoints: [`pipelines/alma-base-image.yml`](pipelines/alma-base-image.yml), [`pipelines/nextjs-app.yml`](pipelines/nextjs-app.yml). Full setup (extensions, Terraform-managed service connections/environments): [pipelines/README.md](pipelines/README.md). Apply order for connections: [infra/terraform/README.md](infra/terraform/README.md) (cicd → dev → ado).
 
 ### Out of scope (follow-up)
 

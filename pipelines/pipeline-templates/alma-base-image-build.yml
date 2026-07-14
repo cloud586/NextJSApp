@@ -1,0 +1,91 @@
+parameters:
+  - name: imageRepository
+    type: string
+    default: alma-ubi
+  - name: dockerfilePath
+    type: string
+  - name: buildContext
+    type: string
+  - name: trunkBranch
+    type: string
+    default: main
+  - name: devAppConfigEndpoint
+    type: string
+  - name: devAzureServiceConnection
+    type: string
+    default: azure-dev-subscription
+  - name: devAcrDockerServiceConnection
+    type: string
+    default: acr-dev
+
+variables:
+  - name: trunkBranchRef
+    value: refs/heads/${{ parameters.trunkBranch }}
+  - name: targetEnvironment
+    ${{ if eq(variables['Build.SourceBranch'], format('refs/heads/{0}', parameters.trunkBranch)) }}:
+      value: dev
+    ${{ else }}:
+      value: none
+  - name: localImageTag
+    value: $(Build.BuildId)
+  - name: devAcrDockerServiceConnection
+    value: ${{ parameters.devAcrDockerServiceConnection }}
+
+stages:
+  - stage: Build
+    displayName: Build and scan base image
+    jobs:
+      - job: BuildValidate
+        displayName: Build and Trivy scan
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - template: ../tech-templates/export-app-config.yml
+            parameters:
+              azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
+              appConfigEndpoint: ${{ parameters.devAppConfigEndpoint }}
+              appConfigLabel: dev
+
+          - template: ../tech-templates/docker-build-alma-base.yml
+            parameters:
+              dockerfilePath: ${{ parameters.dockerfilePath }}
+              buildContext: ${{ parameters.buildContext }}
+              imageRepository: ${{ parameters.imageRepository }}
+              localImageTag: $(localImageTag)
+
+          - template: ../tech-templates/docker-trivy-scan.yml
+            parameters:
+              imageRepository: ${{ parameters.imageRepository }}
+              localImageTag: $(localImageTag)
+
+  - stage: PublishDev
+    displayName: Publish alma-ubi to ACR
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['targetEnvironment'], 'dev'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: PushDev
+        displayName: Push alma-ubi to ACR
+        pool:
+          vmImage: ubuntu-latest
+        environment: dev-acr
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: ../tech-templates/export-app-config.yml
+                  parameters:
+                    azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
+                    appConfigEndpoint: ${{ parameters.devAppConfigEndpoint }}
+                    appConfigLabel: dev
+
+                - template: ../tech-templates/docker-push-acr.yml
+                  parameters:
+                    acrServiceConnection: $(devAcrDockerServiceConnection)
+                    acrLoginServer: $(acr:login-server)
+                    imageRepository: ${{ parameters.imageRepository }}
+                    localImageTag: $(localImageTag)
+                    imageTags:
+                      - latest
+                      - $(Build.BuildId)
