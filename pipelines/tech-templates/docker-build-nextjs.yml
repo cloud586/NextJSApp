@@ -41,6 +41,15 @@ steps:
       BASE_IMAGE_REPOSITORY: ${{ parameters.baseImageRepository }}
       BASE_IMAGE_TAG: ${{ parameters.baseImageTag }}
 
+  # Docker@2 build without containerRegistry still prefixes tags with registries
+  # found in docker config (from the login above). Logout so the image stays
+  # local as imageRepository:localImageTag (required by save / Trivy / push).
+  - task: Docker@2
+    displayName: Log out of ACR before local build
+    inputs:
+      command: logout
+      containerRegistry: ${{ parameters.acrServiceConnection }}
+
   - task: Docker@2
     displayName: Build runtime image (Dockerfile.runtime)
     inputs:
@@ -48,18 +57,16 @@ steps:
       Dockerfile: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}/Dockerfile.runtime
       buildContext: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
       repository: ${{ parameters.imageRepository }}
-      tags: |
-        ${{ parameters.localImageTag }}
+      tags: ${{ parameters.localImageTag }}
+      addPipelineData: false
+      addBaseImageData: false
 
   - bash: |
       set -euo pipefail
       mkdir -p "$(Build.ArtifactStagingDirectory)/docker"
-      docker save "${IMAGE_REPOSITORY}:${LOCAL_IMAGE_TAG}" \
+      docker save "${{ parameters.imageRepository }}:${{ parameters.localImageTag }}" \
         -o "$(Build.ArtifactStagingDirectory)/docker/image.tar"
     displayName: Save Docker image for publish stages
-    env:
-      IMAGE_REPOSITORY: ${{ parameters.imageRepository }}
-      LOCAL_IMAGE_TAG: ${{ parameters.localImageTag }}
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Docker image artifact
