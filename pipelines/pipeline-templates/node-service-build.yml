@@ -95,7 +95,7 @@ stages:
               imageRepository: ${{ parameters.imageRepository }}
               localImageTag: $(localImageTag)
               acrServiceConnection: ${{ parameters.devAcrDockerServiceConnection }}
-              acrLoginServer: $(acr:login-server)
+              acrLoginServer: $(acrLoginServer)
 
           - template: ../tech-templates/docker-trivy-scan.yml
             parameters:
@@ -125,7 +125,7 @@ stages:
                 - template: ../tech-templates/docker-push-acr.yml
                   parameters:
                     acrServiceConnection: $(devAcrDockerServiceConnection)
-                    acrLoginServer: $(acr:login-server)
+                    acrLoginServer: $(acrLoginServer)
                     imageRepository: ${{ parameters.imageRepository }}
                     localImageTag: $(localImageTag)
                     imageTags:
@@ -155,7 +155,7 @@ stages:
                 - template: ../tech-templates/docker-push-acr.yml
                   parameters:
                     acrServiceConnection: $(prodAcrDockerServiceConnection)
-                    acrLoginServer: $(acr:login-server)
+                    acrLoginServer: $(acrLoginServer)
                     imageRepository: ${{ parameters.imageRepository }}
                     localImageTag: $(localImageTag)
                     imageTags:

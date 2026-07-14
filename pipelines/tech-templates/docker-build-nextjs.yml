@@ -25,13 +25,21 @@ steps:
 
   - bash: |
       set -euo pipefail
-      ACR_IMAGE="${{ parameters.acrLoginServer }}/${{ parameters.baseImageRepository }}:${{ parameters.baseImageTag }}"
-      LOCAL_IMAGE="${{ parameters.baseImageRepository }}:${{ parameters.baseImageTag }}"
+      if [ -z "${ACR_LOGIN_SERVER:-}" ]; then
+        echo "##vso[task.logissue type=error]acrLoginServer is empty; cannot pull base image"
+        exit 1
+      fi
+      ACR_IMAGE="${ACR_LOGIN_SERVER}/${BASE_IMAGE_REPOSITORY}:${BASE_IMAGE_TAG}"
+      LOCAL_IMAGE="${BASE_IMAGE_REPOSITORY}:${BASE_IMAGE_TAG}"
       echo "Pulling ${ACR_IMAGE}"
       docker pull "${ACR_IMAGE}"
       docker tag "${ACR_IMAGE}" "${LOCAL_IMAGE}"
       echo "Tagged ${LOCAL_IMAGE} for Dockerfile.runtime"
     displayName: Pull and tag alma-ubi base image
+    env:
+      ACR_LOGIN_SERVER: ${{ parameters.acrLoginServer }}
+      BASE_IMAGE_REPOSITORY: ${{ parameters.baseImageRepository }}
+      BASE_IMAGE_TAG: ${{ parameters.baseImageTag }}
 
   - task: Docker@2
     displayName: Build runtime image (Dockerfile.runtime)
@@ -46,9 +54,12 @@ steps:
   - bash: |
       set -euo pipefail
       mkdir -p "$(Build.ArtifactStagingDirectory)/docker"
-      docker save "${{ parameters.imageRepository }}:${{ parameters.localImageTag }}" \
+      docker save "${IMAGE_REPOSITORY}:${LOCAL_IMAGE_TAG}" \
         -o "$(Build.ArtifactStagingDirectory)/docker/image.tar"
     displayName: Save Docker image for publish stages
+    env:
+      IMAGE_REPOSITORY: ${{ parameters.imageRepository }}
+      LOCAL_IMAGE_TAG: ${{ parameters.localImageTag }}
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Docker image artifact

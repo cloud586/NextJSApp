@@ -53,7 +53,7 @@ After export, pipeline variables are named:
 
 | App Config key | Pipeline variable |
 |----------------|-------------------|
-| `cicd:acr:login-server` | `acr:login-server` |
+| `cicd:acr:login-server` | `acr:login-server` (aliased to `acrLoginServer` after export — use this in Docker steps; colons break bash `$(var)` expansion) |
 | `cicd:acr:name` | `acr:name` |
 | `cicd:sonar:organization` | `sonar:organization` |
 | `cicd:sonar:project-key` | `sonar:project-key` |
