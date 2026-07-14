@@ -46,11 +46,13 @@ steps:
         LOCAL_IMAGE_TAG: ${{ parameters.localImageTag }}
         IMAGE_TAG: ${{ tag }}
 
-  - task: Docker@2
-    displayName: Push image to ACR
-    inputs:
-      command: push
-      containerRegistry: ${{ parameters.acrServiceConnection }}
-      repository: ${{ parameters.imageRepository }}
-      tags: |
-        ${{ join('\n', parameters.imageTags) }}
+  # Do not use join('\n', ...) for Docker@2 tags — template '\n' is literal backslash-n,
+  # producing references like alma-ubi:latest\n99 → invalid reference format.
+  - ${{ each tag in parameters.imageTags }}:
+    - task: Docker@2
+      displayName: Push image — ${{ tag }}
+      inputs:
+        command: push
+        containerRegistry: ${{ parameters.acrServiceConnection }}
+        repository: ${{ parameters.imageRepository }}
+        tags: ${{ tag }}
