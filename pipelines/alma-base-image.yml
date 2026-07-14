@@ -1,0 +1,37 @@
+# Dedicated pipeline for the Alma Linux base image (alma-ubi).
+# Publishes alma-ubi:latest to ACR on merges to main so app images can pull a patched base.
+#
+# Register in Azure DevOps (sutoremu) against this GitHub repository:
+#   Existing YAML → /pipelines/alma-base-image.yml
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - base-images/alma-ubi/**
+      - pipelines/alma-base-image.yml
+      - pipelines/pipeline-templates/alma-base-image-build.yml
+      - pipelines/tech-templates/docker-build-alma-base.yml
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - base-images/alma-ubi/**
+      - pipelines/alma-base-image.yml
+      - pipelines/pipeline-templates/alma-base-image-build.yml
+      - pipelines/tech-templates/docker-build-alma-base.yml
+
+extends:
+  template: pipeline-templates/alma-base-image-build.yml
+  parameters:
+    imageRepository: alma-ubi
+    dockerfilePath: base-images/alma-ubi/Dockerfile
+    buildContext: base-images/alma-ubi
+    trunkBranch: main
+    # Match terraform output app_configuration_endpoint (same as nextjs-app).
+    devAppConfigEndpoint: https://nextjsappdevappcfg.azconfig.io

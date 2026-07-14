@@ -206,7 +206,7 @@ npm run upload-assets
 $acr = terraform output -raw acr_name
 az acr login --name $acr
 
-docker build -f Dockerfile.base -t alma-ubi:latest .
+docker build -f ../base-images/alma-ubi/Dockerfile -t alma-ubi:latest ../base-images/alma-ubi
 docker build -f Dockerfile.runtime -t "$(terraform output -raw acr_login_server)/nextjsapp:latest" .
 docker push "$(terraform output -raw acr_login_server)/nextjsapp:latest"
 

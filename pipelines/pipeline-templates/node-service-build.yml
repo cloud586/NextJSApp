@@ -94,6 +94,8 @@ stages:
               workingDirectory: ${{ parameters.workingDirectory }}
               imageRepository: ${{ parameters.imageRepository }}
               localImageTag: $(localImageTag)
+              acrServiceConnection: ${{ parameters.devAcrDockerServiceConnection }}
+              acrLoginServer: $(acr:login-server)
 
           - template: ../tech-templates/docker-trivy-scan.yml
             parameters:

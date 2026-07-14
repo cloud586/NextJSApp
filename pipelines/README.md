@@ -8,9 +8,11 @@ Build pipelines for [SephieBox/sutoremu](https://dev.azure.com/SephieBox/sutorem
 
 ```
 pipelines/
-  nextjs-app.yml                     # Parent pipeline (triggers + extends)
+  alma-base-image.yml                # Parent: Alma base image (alma-ubi)
+  nextjs-app.yml                     # Parent: Next.js app (triggers + extends)
   pipeline-templates/
-    node-service-build.yml           # Orchestration + trunk/tag routing
+    alma-base-image-build.yml        # Base image build + publish
+    node-service-build.yml           # App orchestration + trunk/tag routing
   tech-templates/
     export-app-config.yml             # AzureAppConfigurationExport@10 — read cicd:* keys
     restore-npm.yml
@@ -18,12 +20,20 @@ pipelines/
     test-vitest.yml
     sonar-prepare.yml
     sonar-analyze-publish.yml
+    docker-build-alma-base.yml
     docker-build-nextjs.yml
     docker-trivy-scan.yml
     docker-push-acr.yml
+
+base-images/
+  alma-ubi/Dockerfile                # Shared Alma Linux base (published as alma-ubi)
 ```
 
 **Layering:** parent pipeline → pipeline template → tech templates.
+
+**Two pipelines:** the Alma base image is built and published separately so security patches can land on `alma-ubi:latest` before app images rebuild and consume it. App builds **pull** `alma-ubi:latest` from ACR; they no longer build the base inline.
+
+> **Bootstrap:** Register and run **alma-base-image** at least once (publish `alma-ubi:latest`) before app builds can succeed.
 
 ## Configuration Keys (App Configuration)
 
@@ -53,6 +63,19 @@ After export, pipeline variables are named:
 
 ## Trunk-Based Development Triggers
 
+### Alma base image (`alma-base-image.yml`)
+
+Path filters: `base-images/alma-ubi/**` and related pipeline YAML under `pipelines/`.
+
+| Event | Auto-trigger | Build/scan | Publish |
+|-------|--------------|------------|---------|
+| PR → `main` (base paths) | yes | build + Trivy | no |
+| Merge to `main` (base paths) | yes | build + Trivy | ACR `alma-ubi:latest` (+ build id) |
+
+### Next.js app (`nextjs-app.yml`)
+
+Path filters: `nextjsapp/**`, `pipelines/**` (does **not** include `base-images/**`).
+
 | Event | Auto-trigger | Build/test/scan | Publish |
 |-------|--------------|-----------------|---------|
 | PR → `main` | yes | full validation | no |
@@ -62,21 +85,31 @@ After export, pipeline variables are named:
 
 ## Pipeline Flow
 
+### Alma base image
+
+1. **Load config** — `AzureAppConfigurationExport@10` reads `cicd:*` keys (dev)
+2. **Docker build** — [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) build of `base-images/alma-ubi/Dockerfile`; save image artifact
+3. **Trivy scan** — fail on CRITICAL/HIGH vulnerabilities
+4. **Publish** (trunk only) — push `alma-ubi:latest` and `alma-ubi:<buildId>` to ACR
+
+### Next.js app
+
 1. **Load config** — `AzureAppConfigurationExport@10` reads `cicd:*` keys (dev store for build; env-specific store for publish)
 2. **Restore** — `npm ci` with npm cache
 3. **Build** — `npm run lint`, `npm run build`
 4. **Test** — `npm run test:coverage` (Vitest unit + component)
 5. **SonarQube Cloud** — [`SonarCloudPrepare@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks) → build → test → [`SonarCloudAnalyze@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks) → [`SonarCloudPublish@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks)
-6. **Docker build** — [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) `build` for `Dockerfile.base` + `Dockerfile.runtime`; save image artifact
+6. **Docker build** — login to ACR, pull `alma-ubi:latest`, tag locally, build `Dockerfile.runtime`; save image artifact
 7. **Trivy scan** — fail on CRITICAL/HIGH vulnerabilities
 8. **Publish** (conditional) — [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) `login` + `push` to dev or prod ACR
 
 ### Image tags
 
-| Trigger | Config store | Registry | Tags |
-|---------|--------------|----------|------|
-| Trunk CI (`main`) | dev | dev ACR | `main-<buildId>`, `main-<shortSha>` |
-| Release tag (`v1.2.0`) | prod | prod ACR | `v1.2.0`, `v1.2.0-<buildId>` |
+| Pipeline | Trigger | Config store | Registry | Tags |
+|----------|---------|--------------|----------|------|
+| alma-base-image | Trunk CI (`main`) | dev | ACR | `latest`, `<buildId>` |
+| nextjs-app | Trunk CI (`main`) | dev | ACR | `main-<buildId>`, `main-<shortSha>` |
+| nextjs-app | Release tag (`v1.2.0`) | prod | ACR | `v1.2.0`, `v1.2.0-<buildId>` |
 
 ## Azure DevOps Setup
 
@@ -99,15 +132,18 @@ Install these DevOps extensions in your organization:
 
 > Use the **SonarQube Cloud** extension (`SonarSource.sonarcloud`), not the older **SonarQube Server** extension (`SonarSource.sonarqube`). The Server tasks (`SonarQubePrepare@6`, etc.) are a different product and will fail with "task is missing" if only Cloud is installed.
 
-### 3. Register the pipeline
+### 3. Register the pipelines
 
-1. Open [sutoremu Pipelines](https://dev.azure.com/SephieBox/sutoremu/_build)
-2. **New pipeline** → **GitHub** → authorize if prompted → select your GitHub repo
-3. **Existing Azure Pipelines YAML file** → branch `main` → path `/pipelines/nextjs-app.yml`
-4. Review and save (first run will wait until service connections exist)
-5. Update `devAppConfigEndpoint` / `prodAppConfigEndpoint` in the parent YAML if your `name_prefix` differs from the defaults
+Register **both** pipelines in [sutoremu Pipelines](https://dev.azure.com/SephieBox/sutoremu/_build):
 
-Triggers and PR validation use GitHub events (`push` to `main`, `v*` tags, PRs targeting `main`) via the ADO GitHub integration.
+1. **alma-base-image** — **New pipeline** → **GitHub** → **Existing Azure Pipelines YAML file** → path `/pipelines/alma-base-image.yml`
+2. **nextjs-app** — same flow → path `/pipelines/nextjs-app.yml`
+
+Run **alma-base-image** on `main` once so `alma-ubi:latest` exists in ACR before relying on nextjs-app Docker builds.
+
+Update `devAppConfigEndpoint` / `prodAppConfigEndpoint` in the parent YAMLs if your `name_prefix` differs from the defaults.
+
+Triggers and PR validation use GitHub events via the ADO GitHub integration.
 
 ### 4. Service connections (Terraform)
 
@@ -168,15 +204,15 @@ Created by the ado Terraform stack (authorized for all pipelines):
 
 | Environment | Approval | Used by |
 |-------------|----------|---------|
-| `dev-acr` | none | PublishDev stage |
-| `prod-acr` | none by default (add manual approval in ADO if desired) | PublishProd stage |
+| `dev-acr` | none | PublishDev (alma-base-image + nextjs-app) |
+| `prod-acr` | none by default (add manual approval in ADO if desired) | PublishProd (nextjs-app) |
 
 ### 8. Branch protection on `main` (GitHub)
 
 Configure on **GitHub** (repo → **Settings → Branches → Branch protection rules** for `main`):
 
 - Require a pull request before merging
-- Require status checks to pass — add the Azure Pipelines `nextjs-app` check after the first successful run
+- Require status checks to pass — add Azure Pipelines `alma-base-image` and `nextjs-app` checks after the first successful runs
 - Optional: require reviewers, block force pushes
 
 ADO branch policies for GitHub repos are also available under **Project settings → Repositories** → your GitHub repo → **Policies**, if you prefer managing rules from Azure DevOps.
@@ -184,12 +220,14 @@ ADO branch policies for GitHub repos are also available under **Project settings
 ## Local Verification
 
 ```powershell
+# From repo root
+docker build -f base-images/alma-ubi/Dockerfile -t alma-ubi:latest base-images/alma-ubi
+
 cd nextjsapp
 npm ci
 npm run lint
 npm run build
 npm run test:coverage
-docker build -f Dockerfile.base -t alma-ubi:latest .
 docker build -f Dockerfile.runtime -t nextjsapp:local .
 ```
 
@@ -198,9 +236,12 @@ docker build -f Dockerfile.runtime -t nextjsapp:local .
 1. Add a parent pipeline with service-specific triggers and App Config endpoints
 2. Create or reuse a pipeline template
 3. Reuse `export-app-config.yml`, `docker-trivy-scan.yml`, `docker-push-acr.yml`
+4. Pull `alma-ubi:latest` from ACR in the Docker build step (same pattern as `docker-build-nextjs.yml`)
 
 ## Out of Scope (Future)
 
+- Base image version / digest pinning (apps currently consume `latest`)
 - Container App deployment — release pipeline
 - Static asset upload — release/deploy pipeline
 - Cypress e2e — nightly or pre-release pipeline
+- Auto-rebuild app images when base `latest` is updated
