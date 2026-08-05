@@ -16,15 +16,13 @@ steps:
       useConfigFile: true
       configFilePath: GitVersion.yml
 
-  # Compose four-part appVersion from GitVersion JSON (+ fallbacks).
-  # TrunkBased/Mainline often sets VersionSourceSha == current Sha on ADO PR
-  # merge refs, so PreReleaseNumber and CommitsSinceVersionSource are both 0.
-  # Revision preference:
+  # Compose four-part appVersion from GitVersion JSON (not ADO macros).
+  # Under TrunkBased/Mainline, CommitsSinceVersionSource is often 0 because the
+  # patch was already incremented; PreReleaseNumber carries the commit counter
+  # on PR/feature branches when GitVersion sets it. Revision preference:
   #   1) PreReleaseNumber when > 0
   #   2) CommitsSinceVersionSource when > 0
-  #   3) System.PullRequest.PullRequestNumber on PR builds
-  #   4) git rev-list count since last v* tag (or total commits if no tag)
-  #   5) else 0
+  #   3) else 0 (clean trunk / tagged release / ADO PR merge refs where both are 0)
   - bash: |
       set -euo pipefail
 
@@ -43,8 +41,6 @@ steps:
       TAG_VERSION="$(echo "${GV_JSON}" | jq -r '.MajorMinorPatch')"
       COMMITS="$(echo "${GV_JSON}" | jq -r '.CommitsSinceVersionSource // 0')"
       PRE_RELEASE="$(echo "${GV_JSON}" | jq -r '.PreReleaseNumber // 0')"
-      VERSION_SOURCE_SHA="$(echo "${GV_JSON}" | jq -r '.VersionSourceSha // empty')"
-      CURRENT_SHA="$(echo "${GV_JSON}" | jq -r '.Sha // empty')"
 
       if [ -z "$MAJOR" ] || [ "$MAJOR" = "null" ] || \
          [ -z "$MINOR" ] || [ "$MINOR" = "null" ] || \
@@ -61,33 +57,18 @@ steps:
         COMMITS=0
       fi
 
-      REVISION_SOURCE="none"
       if [ "$PRE_RELEASE" -gt 0 ]; then
         REVISION="$PRE_RELEASE"
-        REVISION_SOURCE="PreReleaseNumber"
       elif [ "$COMMITS" -gt 0 ]; then
         REVISION="$COMMITS"
-        REVISION_SOURCE="CommitsSinceVersionSource"
-      elif [ -n "${PULL_REQUEST_NUMBER:-}" ] && [ "${PULL_REQUEST_NUMBER}" -gt 0 ] 2>/dev/null; then
-        REVISION="${PULL_REQUEST_NUMBER}"
-        REVISION_SOURCE="PullRequestNumber"
       else
-        LAST_TAG="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
-        if [ -n "${LAST_TAG}" ]; then
-          REVISION="$(git rev-list --count "${LAST_TAG}..HEAD")"
-          REVISION_SOURCE="git-rev-list since ${LAST_TAG}"
-        else
-          REVISION="$(git rev-list --count HEAD)"
-          REVISION_SOURCE="git-rev-list total"
-        fi
+        REVISION=0
       fi
 
       APP_VERSION="${MAJOR}.${MINOR}.${PATCH}.${REVISION}"
       SHORT_SHA="$(echo "${BUILD_SOURCEVERSION}" | cut -c1-7)"
 
-      echo "VersionSourceSha=${VERSION_SOURCE_SHA} Sha=${CURRENT_SHA}"
-      echo "PreReleaseNumber=${PRE_RELEASE} CommitsSinceVersionSource=${COMMITS} PullRequestNumber=${PULL_REQUEST_NUMBER:-}"
-      echo "Revision=${REVISION} (source=${REVISION_SOURCE})"
+      echo "PreReleaseNumber=${PRE_RELEASE} CommitsSinceVersionSource=${COMMITS} -> Revision=${REVISION}"
       echo "appVersion=${APP_VERSION}"
       echo "appVersionTag=${TAG_VERSION}"
       echo "shortSha=${SHORT_SHA}"
@@ -103,4 +84,3 @@ steps:
     displayName: Export appVersion outputs
     env:
       BUILD_SOURCEVERSION: $(Build.SourceVersion)
-      PULL_REQUEST_NUMBER: $(System.PullRequest.PullRequestNumber)

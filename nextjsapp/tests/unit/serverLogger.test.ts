@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -9,8 +9,20 @@ import { getServerLogBindings } from "@/lib/logging/serverLogger";
 import { X_CORRELATION_ID } from "@/lib/logging/constants";
 
 describe("serverLogger bindings", () => {
+  let previousAppVersion: string | undefined;
+
   beforeEach(() => {
     vi.mocked(headers).mockReset();
+    previousAppVersion = process.env.APP_VERSION;
+    delete process.env.APP_VERSION;
+  });
+
+  afterEach(() => {
+    if (previousAppVersion === undefined) {
+      delete process.env.APP_VERSION;
+    } else {
+      process.env.APP_VERSION = previousAppVersion;
+    }
   });
 
   it("includes correlationId from request headers", async () => {
@@ -45,18 +57,9 @@ describe("serverLogger bindings", () => {
     vi.mocked(headers).mockResolvedValue(
       new Headers({ [X_CORRELATION_ID]: "server-corr" }) as never,
     );
-    const previous = process.env.APP_VERSION;
     process.env.APP_VERSION = "1.2.3.0";
 
-    try {
-      const bindings = await getServerLogBindings();
-      expect(bindings.appVersion).toBe("1.2.3.0");
-    } finally {
-      if (previous === undefined) {
-        delete process.env.APP_VERSION;
-      } else {
-        process.env.APP_VERSION = previous;
-      }
-    }
+    const bindings = await getServerLogBindings();
+    expect(bindings.appVersion).toBe("1.2.3.0");
   });
 });
