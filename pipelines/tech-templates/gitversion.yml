@@ -1,13 +1,17 @@
 # Calculates Major.Minor.Patch.Revision via GitVersion and exports pipeline outputs
 # for later stages (ACR tags, auto-tag, Docker, Node stamp).
+#
+# Use fully qualified GitTools task IDs (gittools.gitversion.*@0).
+# Short names like gitversion/setup@3 are GitHub Actions IDs and are not
+# registered by the Azure DevOps marketplace extension.
 
 steps:
-  - task: gitversion/setup@3
+  - task: gittools.gitversion.setup@0
     displayName: Install GitVersion
     inputs:
       versionSpec: '5.12.0'
 
-  - task: gitversion/execute@3
+  - task: gittools.gitversion.execute@0
     displayName: Calculate version
     inputs:
       useConfigFile: true
@@ -15,6 +19,7 @@ steps:
 
   # Compose four-part appVersion and expose cross-stage outputs.
   # CommitsSinceVersionSource is Revision (0 on tagged trunk commits).
+  # GitTools ADO tasks export GitVersion_* (underscore) variables.
   - bash: |
       set -euo pipefail
       MAJOR="${GITVERSION_MAJOR:-}"
@@ -46,9 +51,9 @@ steps:
     name: SetAppVersion
     displayName: Export appVersion outputs
     env:
-      GITVERSION_MAJOR: $(GitVersion.Major)
-      GITVERSION_MINOR: $(GitVersion.Minor)
-      GITVERSION_PATCH: $(GitVersion.Patch)
-      GITVERSION_MAJOR_MINOR_PATCH: $(GitVersion.MajorMinorPatch)
-      GITVERSION_COMMITS_SINCE_VERSION_SOURCE: $(GitVersion.CommitsSinceVersionSource)
+      GITVERSION_MAJOR: $(GitVersion_Major)
+      GITVERSION_MINOR: $(GitVersion_Minor)
+      GITVERSION_PATCH: $(GitVersion_Patch)
+      GITVERSION_MAJOR_MINOR_PATCH: $(GitVersion_MajorMinorPatch)
+      GITVERSION_COMMITS_SINCE_VERSION_SOURCE: $(GitVersion_CommitsSinceVersionSource)
       BUILD_SOURCEVERSION: $(Build.SourceVersion)
