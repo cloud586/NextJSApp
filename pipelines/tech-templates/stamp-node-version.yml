@@ -1,0 +1,33 @@
+# Stamps Node toolchain inputs before npm run build.
+# - package.json version = Major.Minor.Patch (npm SemVer; no fourth segment)
+# - APP_VERSION / NEXT_PUBLIC_APP_VERSION = Major.Minor.Patch.Revision
+# Stamps are CI-workspace only; do not commit.
+
+parameters:
+  - name: workingDirectory
+    type: string
+  - name: appVersion
+    type: string
+  - name: appVersionTag
+    type: string
+
+steps:
+  - bash: |
+      set -euo pipefail
+      if [ -z "${APP_VERSION_TAG:-}" ] || [ -z "${APP_VERSION:-}" ]; then
+        echo "##vso[task.logissue type=error]appVersion/appVersionTag empty; run GitVersion first"
+        exit 1
+      fi
+
+      echo "Stamping package.json version=${APP_VERSION_TAG}"
+      npm version "${APP_VERSION_TAG}" --no-git-tag-version --allow-same-version
+
+      echo "APP_VERSION=${APP_VERSION}"
+      echo "NEXT_PUBLIC_APP_VERSION=${APP_VERSION}"
+      echo "##vso[task.setvariable variable=APP_VERSION]${APP_VERSION}"
+      echo "##vso[task.setvariable variable=NEXT_PUBLIC_APP_VERSION]${APP_VERSION}"
+    displayName: Stamp package.json and version env
+    workingDirectory: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
+    env:
+      APP_VERSION: ${{ parameters.appVersion }}
+      APP_VERSION_TAG: ${{ parameters.appVersionTag }}

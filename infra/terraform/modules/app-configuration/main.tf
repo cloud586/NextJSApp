@@ -14,6 +14,9 @@ locals {
     "cicd:sonar:token" = {
       secret_name = "sonar-token"
     }
+    "cicd:github:tag-push-token" = {
+      secret_name = "github-tag-push-token"
+    }
   }
 
   key_vault_refs = merge(local.app_key_vault_refs, local.cicd_key_vault_refs)

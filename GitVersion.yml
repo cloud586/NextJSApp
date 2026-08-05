@@ -1,0 +1,26 @@
+# Trunk-based versioning for nextjsapp (GitVersion 6+).
+# Canonical artifact/runtime version: Major.Minor.Patch.Revision
+#   Revision = CommitsSinceVersionSource / VersionSourceDistance (0 on tagged trunk).
+# Git tags remain three-part: vMajor.Minor.Patch
+#
+# Bump intent on merge commits / PR titles: +semver: major|minor|patch (default Patch).
+#
+# Four-part Assembly* formats are composed in the pipeline (GitVersion 6 format
+# strings do not expose VersionSourceDistance as a format member).
+
+workflow: TrunkBased/preview1
+next-version: 0.1.0
+
+branches:
+  main:
+    regex: ^main$
+    increment: Patch
+    label: ''
+    is-main-branch: true
+    source-branches: []
+  pull-request:
+    regex: ^(pull|pull\-requests|pr)[/-]
+    label: pullrequest
+    increment: Inherit
+    source-branches:
+      - main

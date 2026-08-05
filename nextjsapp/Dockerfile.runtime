@@ -21,6 +21,8 @@ RUN SOURCE_NODE_MODULES=/build-node_modules STANDALONE_DIR=/app \
 
 FROM alma-ubi:latest
 
+ARG APP_VERSION=0.0.0.0-local
+ENV APP_VERSION=$APP_VERSION
 ENV NODE_ENV=production
 # Runtime: Azure App Configuration is loaded at startup via bootstrap-config.mjs.
 # For local Docker without Azure, pass --env-file .env.local instead.
