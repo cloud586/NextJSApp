@@ -12,9 +12,12 @@ pipelines/
   nextjs-app.yml                     # Parent: Next.js app (triggers + extends)
   pipeline-templates/
     alma-base-image-build.yml        # Base image build + publish
-    node-service-build.yml           # App orchestration + trunk/tag routing
+    node-service-build.yml           # App orchestration + trunk/tag routing + GitVersion
   tech-templates/
     export-app-config.yml             # AzureAppConfigurationExport@10 — read cicd:* keys
+    gitversion.yml                    # GitVersion setup/execute + appVersion outputs
+    stamp-node-version.yml            # Stamp package.json + APP_VERSION env before build
+    git-tag-release.yml               # Annotated vMajor.Minor.Patch push to GitHub
     restore-npm.yml
     build-node.yml
     test-vitest.yml
@@ -25,6 +28,7 @@ pipelines/
     docker-trivy-scan.yml
     docker-push-acr.yml
 
+GitVersion.yml                       # Mainline config (repo root)
 base-images/
   alma-ubi/Dockerfile                # Shared Alma Linux base (published as alma-ubi)
 ```
@@ -46,6 +50,7 @@ Terraform writes these keys per environment (label = `dev` or `prod`):
 | `cicd:sonar:organization` | plain | SonarCloud organization key |
 | `cicd:sonar:project-key` | plain | SonarCloud project key |
 | `cicd:sonar:token` | Key Vault ref | SonarCloud API token (`sonar-token` secret) |
+| `cicd:github:tag-push-token` | Key Vault ref | GitHub PAT/token for pushing `v*` tags (`github-tag-push-token` secret) |
 
 The pipeline loads these via [`export-app-config.yml`](tech-templates/export-app-config.yml) using the OOTB [`AzureAppConfigurationExport@10`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-app-configuration-export-v10) task (`KeyFilter: cicd:*`, `TrimKeyPrefix: cicd:`).
 
@@ -58,6 +63,7 @@ After export, pipeline variables are named:
 | `cicd:sonar:organization` | `sonar:organization` |
 | `cicd:sonar:project-key` | `sonar:project-key` |
 | `cicd:sonar:token` | `sonar:token` (Key Vault ref, resolved by export task) |
+| `cicd:github:tag-push-token` | `github:tag-push-token` (Key Vault ref; used by TagRelease) |
 
 > **Import vs Export:** [`AzureAppConfigurationImport@10`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-app-configuration-import-v10) pushes settings **from a repo config file into** App Configuration (useful for infra/sync pipelines). [`AzureAppConfigurationExport@10`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-app-configuration-export-v10) reads settings **from** App Configuration into pipeline variables — that is what build pipelines need at runtime.
 
@@ -74,14 +80,30 @@ Path filters: `base-images/alma-ubi/**` and related pipeline YAML under `pipelin
 
 ### Next.js app (`nextjs-app.yml`)
 
-Path filters: `nextjsapp/**`, `pipelines/**` (does **not** include `base-images/**`).
+Path filters: `nextjsapp/**`, `pipelines/**`, `GitVersion.yml` (does **not** include `base-images/**`).
 
-| Event | Auto-trigger | Build/test/scan | Publish |
-|-------|--------------|-----------------|---------|
-| PR → `main` | yes | full validation | no |
-| Merge to `main` | yes | full validation | dev ACR |
-| Tag `v*` on trunk | yes | full validation | prod ACR |
-| Push to feature branch (no PR) | no | — | — |
+| Event | Auto-trigger | Build/test/scan | Publish | Git tag |
+|-------|--------------|-----------------|---------|---------|
+| PR → `main` | yes | full validation | no | no |
+| Merge to `main` | yes | full validation | dev ACR (`Major.Minor.Patch.Revision`) | auto `vMajor.Minor.Patch` after PublishDev |
+| Tag `v*` on trunk | yes | full validation | prod ACR (same four-part version) | do not re-tag |
+| Push to feature branch (no PR) | no | — | — | — |
+
+## Versioning (GitVersion Mainline)
+
+Canonical version string: **`Major.Minor.Patch.Revision`**.
+
+| Segment | Meaning |
+|---------|---------|
+| Major / Minor / Patch | GitVersion Mainline; bump with `+semver: major\|minor\|patch` on the merge commit (default Patch) |
+| Revision | Commits since version source (`0` on a tagged trunk release) |
+
+- **Git tags:** `vMajor.Minor.Patch` (three-part; GitVersion source of truth)
+- **ACR / Docker `APP_VERSION` / logs / Sonar:** four-part `Major.Minor.Patch.Revision`
+- **`package.json`:** stamped in CI to three-part `Major.Minor.Patch` only (npm SemVer); not committed
+- **Pre-build:** GitVersion → stamp Node env + `package.json` → `npm run build` → Docker `--build-arg APP_VERSION`
+
+Trunk-based rules: single long-lived `main`, short-lived PRs, every successful trunk publish is releasable, no GitFlow release branches.
 
 ## Pipeline Flow
 
@@ -94,22 +116,28 @@ Path filters: `nextjsapp/**`, `pipelines/**` (does **not** include `base-images/
 
 ### Next.js app
 
-1. **Load config** — `AzureAppConfigurationExport@10` reads `cicd:*` keys (dev store for build; env-specific store for publish)
-2. **Restore** — `npm ci` with npm cache
-3. **Build** — `npm run lint`, `npm run build`
-4. **Test** — `npm run test:coverage` (Vitest unit + component)
-5. **SonarQube Cloud** — [`SonarCloudPrepare@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks) → build → test → [`SonarCloudAnalyze@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks) → [`SonarCloudPublish@4`](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/azure-pipelines/sonarqube-tasks)
-6. **Docker build** — login to ACR, pull `alma-ubi:latest`, tag locally, build `Dockerfile.runtime`; save image artifact
-7. **Trivy scan** — fail on CRITICAL/HIGH vulnerabilities
-8. **Publish** (conditional) — [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) `login` + `push` to dev or prod ACR
+1. **GitVersion** — Mainline calculate; export `appVersion` / `appVersionTag` (cross-stage outputs)
+2. **Load config** — `AzureAppConfigurationExport@10` reads `cicd:*` keys (dev store for build; env-specific store for publish)
+3. **Restore** — `npm ci` with npm cache
+4. **Stamp version** — `package.json` + `APP_VERSION` / `NEXT_PUBLIC_APP_VERSION`
+5. **Build** — `npm run lint`, `npm run build` (version env baked into client bundle)
+6. **Test** — `npm run test:coverage` (Vitest unit + component)
+7. **SonarQube Cloud** — prepare (`sonar.projectVersion`) → analyze → publish
+8. **Docker build** — pull `alma-ubi:latest`, build `Dockerfile.runtime` with `APP_VERSION`; save image artifact
+9. **Trivy scan** — fail on CRITICAL/HIGH vulnerabilities
+10. **PublishDev** (trunk) — push four-part tags to dev ACR
+11. **TagRelease** (trunk) — annotated `vMajor.Minor.Patch` → GitHub (triggers prod pipeline)
+12. **PublishProd** (tag) — push four-part tags to prod ACR
 
 ### Image tags
 
 | Pipeline | Trigger | Config store | Registry | Tags |
 |----------|---------|--------------|----------|------|
 | alma-base-image | Trunk CI (`main`) | dev | ACR | `latest`, `<buildId>` |
-| nextjs-app | Trunk CI (`main`) | dev | ACR | `main-<buildId>`, `main-<shortSha>` |
-| nextjs-app | Release tag (`v1.2.0`) | prod | ACR | `v1.2.0`, `v1.2.0-<buildId>` |
+| nextjs-app | Trunk CI (`main`) | dev | ACR | `Major.Minor.Patch.Revision`, `Major.Minor.Patch.Revision-<shortSha>` |
+| nextjs-app | Release tag (`v1.2.0`) | prod | ACR | `1.2.0.0`, `1.2.0.0-<shortSha>` |
+
+> Terraform Container Apps still default to `nextjsapp:latest`. Pin `container_image` to a four-part tag manually until a deploy pipeline exists.
 
 ## Azure DevOps Setup
 
@@ -129,6 +157,7 @@ Install these DevOps extensions in your organization:
 |-----------|-------------|---------|
 | [Azure App Configuration](https://marketplace.visualstudio.com/items?itemName=AzureAppConfiguration.azure-app-configuration-tasks) | `AzureAppConfiguration.azure-app-configuration-tasks` | `AzureAppConfigurationExport@10`, `AzureAppConfigurationImport@10` |
 | [SonarQube Cloud](https://marketplace.visualstudio.com/items?itemName=SonarSource.sonarcloud) | `SonarSource.sonarcloud` | `SonarCloudPrepare@4`, `SonarCloudAnalyze@4`, `SonarCloudPublish@4` |
+| [GitTools](https://marketplace.visualstudio.com/items?itemName=gittools.gittools) | `gittools.gittools` | `gitversion/setup@3`, `gitversion/execute@3` |
 
 > Use the **SonarQube Cloud** extension (`SonarSource.sonarcloud`), not the older **SonarQube Server** extension (`SonarSource.sonarqube`). The Server tasks (`SonarQubePrepare@6`, etc.) are a different product and will fail with "task is missing" if only Cloud is installed.
 
@@ -182,11 +211,15 @@ Run from the **repository root** (`NextJSApp/`):
 # Dev
 $kv = terraform -chdir=infra/terraform/environments/dev output -raw key_vault_name
 az keyvault secret set --vault-name $kv --name sonar-token --value "<SonarCloud token>"
+az keyvault secret set --vault-name $kv --name github-tag-push-token --value "<GitHub PAT with contents:write>"
 
-# Prod (same token or a dedicated prod token)
+# Prod (sonar token; github tag push uses the dev export during TagRelease today)
 $kv = terraform -chdir=infra/terraform/environments/prod output -raw key_vault_name
 az keyvault secret set --vault-name $kv --name sonar-token --value "<SonarCloud token>"
+az keyvault secret set --vault-name $kv --name github-tag-push-token --value "<GitHub PAT with contents:write>"
 ```
+
+The GitHub token needs permission to create tags on the source repository (classic PAT: `repo`, or fine-grained: **Contents: Read and write**). Re-apply the App Configuration Terraform module so `cicd:github:tag-push-token` exists, then seed the Key Vault secret before the first TagRelease run.
 
 If you are already inside an environment directory (e.g. `infra/terraform/environments/dev`), omit `-chdir` and use `terraform output` there instead:
 
@@ -207,6 +240,8 @@ Created by the ado Terraform stack (authorized for all pipelines):
 | `dev-acr` | none | PublishDev (alma-base-image + nextjs-app) |
 | `prod-acr` | none by default (add manual approval in ADO if desired) | PublishProd (nextjs-app) |
 
+TagRelease runs as a normal job (not an environment deployment) after PublishDev and pushes `vMajor.Minor.Patch` to GitHub.
+
 ### 8. Branch protection on `main` (GitHub)
 
 Configure on **GitHub** (repo → **Settings → Branches → Branch protection rules** for `main`):
@@ -225,10 +260,12 @@ docker build -f base-images/alma-ubi/Dockerfile -t alma-ubi:latest base-images/a
 
 cd nextjsapp
 npm ci
+$env:APP_VERSION = "0.0.0.0-local"
+$env:NEXT_PUBLIC_APP_VERSION = "0.0.0.0-local"
 npm run lint
 npm run build
 npm run test:coverage
-docker build -f Dockerfile.runtime -t nextjsapp:local .
+docker build -f Dockerfile.runtime --build-arg APP_VERSION=0.0.0.0-local -t nextjsapp:local .
 ```
 
 ## Adding Another Service

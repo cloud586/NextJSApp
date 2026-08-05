@@ -32,5 +32,6 @@ export async function getServerLogBindings(
   extra?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const correlationId = await getCorrelationId();
-  return { correlationId, source: "server", ...extra };
+  const appVersion = process.env.APP_VERSION || "0.0.0.0-local";
+  return { correlationId, source: "server", appVersion, ...extra };
 }

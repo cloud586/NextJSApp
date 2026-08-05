@@ -43,8 +43,6 @@ variables:
       value: none
   - name: localImageTag
     value: $(Build.BuildId)
-  - name: shortSha
-    value: $[substring(variables['Build.SourceVersion'], 0, 7)]
   - name: devAcrDockerServiceConnection
     value: ${{ parameters.devAcrDockerServiceConnection }}
   - name: prodAcrDockerServiceConnection
@@ -64,6 +62,8 @@ stages:
           - checkout: self
             fetchDepth: 0
 
+          - template: ../tech-templates/gitversion.yml
+
           - template: ../tech-templates/export-app-config.yml
             parameters:
               azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
@@ -74,14 +74,22 @@ stages:
             parameters:
               workingDirectory: ${{ parameters.workingDirectory }}
 
+          - template: ../tech-templates/stamp-node-version.yml
+            parameters:
+              workingDirectory: ${{ parameters.workingDirectory }}
+              appVersion: $(appVersion)
+              appVersionTag: $(appVersionTag)
+
           - template: ../tech-templates/sonar-prepare.yml
             parameters:
               workingDirectory: ${{ parameters.workingDirectory }}
+              projectVersion: $(appVersion)
 
           - template: ../tech-templates/build-node.yml
             parameters:
               workingDirectory: ${{ parameters.workingDirectory }}
               artifactName: $(buildArtifactName)
+              appVersion: $(appVersion)
 
           - template: ../tech-templates/test-vitest.yml
             parameters:
@@ -94,6 +102,7 @@ stages:
               workingDirectory: ${{ parameters.workingDirectory }}
               imageRepository: ${{ parameters.imageRepository }}
               localImageTag: $(localImageTag)
+              appVersion: $(appVersion)
               acrServiceConnection: ${{ parameters.devAcrDockerServiceConnection }}
               acrLoginServer: $(acrLoginServer)
 
@@ -106,6 +115,9 @@ stages:
     displayName: Publish to dev ACR
     dependsOn: Build
     condition: and(succeeded(), eq(variables['targetEnvironment'], 'dev'), ne(variables['Build.Reason'], 'PullRequest'))
+    variables:
+      appVersion: $[stageDependencies.Build.BuildValidate.outputs['SetAppVersion.appVersion']]
+      shortSha: $[stageDependencies.Build.BuildValidate.outputs['SetAppVersion.shortSha']]
     jobs:
       - deployment: PushDev
         displayName: Push image to dev ACR
@@ -129,13 +141,40 @@ stages:
                     imageRepository: ${{ parameters.imageRepository }}
                     localImageTag: $(localImageTag)
                     imageTags:
-                      - main-$(Build.BuildId)
-                      - main-$(shortSha)
+                      - $(appVersion)
+                      - $(appVersion)-$(shortSha)
+
+  - stage: TagRelease
+    displayName: Tag release on trunk
+    dependsOn:
+      - Build
+      - PublishDev
+    condition: and(succeeded(), eq(variables['targetEnvironment'], 'dev'), ne(variables['Build.Reason'], 'PullRequest'))
+    variables:
+      appVersionTag: $[stageDependencies.Build.BuildValidate.outputs['SetAppVersion.appVersionTag']]
+    jobs:
+      - job: PushGitTag
+        displayName: Create annotated vMajor.Minor.Patch
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - template: ../tech-templates/export-app-config.yml
+            parameters:
+              azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
+              appConfigEndpoint: ${{ parameters.devAppConfigEndpoint }}
+              appConfigLabel: dev
+
+          - template: ../tech-templates/git-tag-release.yml
+            parameters:
+              appVersionTag: $(appVersionTag)
 
   - stage: PublishProd
     displayName: Publish to prod ACR
     dependsOn: Build
     condition: and(succeeded(), eq(variables['targetEnvironment'], 'prod'))
+    variables:
+      appVersion: $[stageDependencies.Build.BuildValidate.outputs['SetAppVersion.appVersion']]
+      shortSha: $[stageDependencies.Build.BuildValidate.outputs['SetAppVersion.shortSha']]
     jobs:
       - deployment: PushProd
         displayName: Push image to prod ACR
@@ -159,5 +198,5 @@ stages:
                     imageRepository: ${{ parameters.imageRepository }}
                     localImageTag: $(localImageTag)
                     imageTags:
-                      - $(Build.SourceBranchName)
-                      - $(Build.SourceBranchName)-$(Build.BuildId)
+                      - $(appVersion)
+                      - $(appVersion)-$(shortSha)

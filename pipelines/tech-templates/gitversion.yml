@@ -1,0 +1,54 @@
+# Calculates Major.Minor.Patch.Revision via GitVersion and exports pipeline outputs
+# for later stages (ACR tags, auto-tag, Docker, Node stamp).
+
+steps:
+  - task: gitversion/setup@3
+    displayName: Install GitVersion
+    inputs:
+      versionSpec: '5.12.0'
+
+  - task: gitversion/execute@3
+    displayName: Calculate version
+    inputs:
+      useConfigFile: true
+      configFilePath: GitVersion.yml
+
+  # Compose four-part appVersion and expose cross-stage outputs.
+  # CommitsSinceVersionSource is Revision (0 on tagged trunk commits).
+  - bash: |
+      set -euo pipefail
+      MAJOR="${GITVERSION_MAJOR:-}"
+      MINOR="${GITVERSION_MINOR:-}"
+      PATCH="${GITVERSION_PATCH:-}"
+      REVISION="${GITVERSION_COMMITS_SINCE_VERSION_SOURCE:-0}"
+      TAG_VERSION="${GITVERSION_MAJOR_MINOR_PATCH:-}"
+
+      if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ] || [ -z "$TAG_VERSION" ]; then
+        echo "##vso[task.logissue type=error]GitVersion variables missing after execute"
+        echo "MAJOR='${MAJOR}' MINOR='${MINOR}' PATCH='${PATCH}' TAG='${TAG_VERSION}'"
+        exit 1
+      fi
+
+      APP_VERSION="${MAJOR}.${MINOR}.${PATCH}.${REVISION}"
+      SHORT_SHA="$(echo "${BUILD_SOURCEVERSION}" | cut -c1-7)"
+
+      echo "appVersion=${APP_VERSION}"
+      echo "appVersionTag=${TAG_VERSION}"
+      echo "shortSha=${SHORT_SHA}"
+
+      echo "##vso[task.setvariable variable=appVersion]${APP_VERSION}"
+      echo "##vso[task.setvariable variable=appVersionTag]${TAG_VERSION}"
+      echo "##vso[task.setvariable variable=shortSha]${SHORT_SHA}"
+
+      echo "##vso[task.setvariable variable=appVersion;isOutput=true]${APP_VERSION}"
+      echo "##vso[task.setvariable variable=appVersionTag;isOutput=true]${TAG_VERSION}"
+      echo "##vso[task.setvariable variable=shortSha;isOutput=true]${SHORT_SHA}"
+    name: SetAppVersion
+    displayName: Export appVersion outputs
+    env:
+      GITVERSION_MAJOR: $(GitVersion.Major)
+      GITVERSION_MINOR: $(GitVersion.Minor)
+      GITVERSION_PATCH: $(GitVersion.Patch)
+      GITVERSION_MAJOR_MINOR_PATCH: $(GitVersion.MajorMinorPatch)
+      GITVERSION_COMMITS_SINCE_VERSION_SOURCE: $(GitVersion.CommitsSinceVersionSource)
+      BUILD_SOURCEVERSION: $(Build.SourceVersion)

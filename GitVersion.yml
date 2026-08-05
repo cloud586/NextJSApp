@@ -1,0 +1,37 @@
+# Trunk-based Mainline versioning for nextjsapp.
+# Canonical artifact/runtime version: Major.Minor.Patch.Revision
+#   Revision = commits since version source (0 on a tagged trunk release).
+# Git tags remain three-part: vMajor.Minor.Patch
+#
+# Bump intent on merge commits / PR titles: +semver: major|minor|patch (default Patch).
+
+mode: Mainline
+next-version: 0.1.0
+
+assembly-file-versioning-format: '{Major}.{Minor}.{Patch}.{CommitsSinceVersionSource}'
+assembly-versioning-format: '{Major}.{Minor}.{Patch}.{CommitsSinceVersionSource}'
+
+branches:
+  main:
+    regex: ^main$
+    mode: Mainline
+    tag: ''
+    increment: Patch
+    prevent-increment-of-merged-branch-version: true
+    track-merge-target: false
+    is-mainline: true
+    source-branches: []
+  pull-request:
+    regex: ^(pull|pull\-requests|pr)[/-]
+    mode: ContinuousDelivery
+    tag: pullrequest
+    increment: Inherit
+    tag-number-pattern: '[/-](?<number>\d+)[-/]'
+    track-merge-target: false
+    source-branches:
+      - main
+
+ignore:
+  sha: []
+
+merge-message-formats: {}

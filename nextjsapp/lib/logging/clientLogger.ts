@@ -61,6 +61,9 @@ function wrapWithNewRelic(
     return;
   }
 
+  const appVersion =
+    process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0.0-local";
+
   for (const method of LOGLEVEL_METHODS) {
     if (typeof logger[method] !== "function") {
       continue;
@@ -71,6 +74,7 @@ function wrapWithNewRelic(
         correlationId,
         logger: name,
         source: "client",
+        appVersion,
       },
     });
   }

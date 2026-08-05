@@ -4,6 +4,9 @@ parameters:
   - name: artifactName
     type: string
     default: nextjs-build
+  - name: appVersion
+    type: string
+    default: 0.0.0.0-local
 
 steps:
   - script: npm run lint
@@ -13,6 +16,9 @@ steps:
   - script: npm run build
     displayName: npm run build
     workingDirectory: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
+    env:
+      APP_VERSION: ${{ parameters.appVersion }}
+      NEXT_PUBLIC_APP_VERSION: ${{ parameters.appVersion }}
 
   - task: PublishPipelineArtifact@1
     displayName: Publish build output

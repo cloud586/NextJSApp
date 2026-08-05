@@ -40,3 +40,11 @@ exports.config = {
     ],
   },
 };
+
+// Attach release version for APM (same Major.Minor.Patch.Revision as Pino / Docker).
+if (typeof process !== "undefined" && process.env) {
+  process.env.NEW_RELIC_METADATA_SERVICE_VERSION =
+    process.env.NEW_RELIC_METADATA_SERVICE_VERSION ||
+    process.env.APP_VERSION ||
+    "0.0.0.0-local";
+}

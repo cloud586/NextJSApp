@@ -1,0 +1,58 @@
+# Creates annotated vMajor.Minor.Patch on successful trunk publish and pushes to GitHub.
+# Requires cicd:github:tag-push-token (Key Vault ref) exported as github:tag-push-token.
+
+parameters:
+  - name: appVersionTag
+    type: string
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+    persistCredentials: false
+
+  - bash: |
+      set -euo pipefail
+
+      TAG_VERSION="${APP_VERSION_TAG:-}"
+      TOKEN="${GITHUB_TOKEN:-}"
+
+      if [ -z "$TAG_VERSION" ]; then
+        echo "##vso[task.logissue type=error]appVersionTag is empty"
+        exit 1
+      fi
+      if [ -z "$TOKEN" ]; then
+        echo "##vso[task.logissue type=error]github:tag-push-token is empty; seed Key Vault secret github-tag-push-token and App Config cicd:github:tag-push-token"
+        exit 1
+      fi
+
+      TAG="v${TAG_VERSION}"
+      echo "Release tag: ${TAG}"
+
+      if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+        echo "Tag ${TAG} already exists locally; skipping create"
+      else
+        git config user.email "azure-pipelines@sutoremu.local"
+        git config user.name "Azure Pipelines"
+        git tag -a "${TAG}" -m "Release ${TAG}"
+      fi
+
+      # Build.Repository.Name is owner/repo for GitHub in Azure DevOps
+      REPO_NAME="${BUILD_REPOSITORY_NAME:-}"
+      if [ -z "$REPO_NAME" ]; then
+        echo "##vso[task.logissue type=error]Build.Repository.Name is empty"
+        exit 1
+      fi
+
+      # Skip push if remote already has the tag
+      if git ls-remote --tags "https://x-access-token:${TOKEN}@github.com/${REPO_NAME}.git" "refs/tags/${TAG}" | grep -q "refs/tags/${TAG}"; then
+        echo "Tag ${TAG} already exists on remote; skipping push"
+        exit 0
+      fi
+
+      git push "https://x-access-token:${TOKEN}@github.com/${REPO_NAME}.git" "refs/tags/${TAG}"
+      echo "Pushed ${TAG}"
+    displayName: Create and push release tag
+    env:
+      APP_VERSION_TAG: ${{ parameters.appVersionTag }}
+      GITHUB_TOKEN: $(github:tag-push-token)
+      BUILD_REPOSITORY_NAME: $(Build.Repository.Name)

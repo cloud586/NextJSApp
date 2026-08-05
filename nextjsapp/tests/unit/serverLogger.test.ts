@@ -23,6 +23,7 @@ describe("serverLogger bindings", () => {
     expect(bindings).toMatchObject({
       correlationId: "server-corr",
       source: "server",
+      appVersion: "0.0.0.0-local",
       route: "test",
     });
   });
@@ -36,6 +37,26 @@ describe("serverLogger bindings", () => {
     const bindings = await getServerLogBindings();
 
     expect(bindings.correlationId).toBe("fallback-uuid");
+    expect(bindings.appVersion).toBe("0.0.0.0-local");
     vi.unstubAllGlobals();
+  });
+
+  it("uses APP_VERSION from the environment when set", async () => {
+    vi.mocked(headers).mockResolvedValue(
+      new Headers({ [X_CORRELATION_ID]: "server-corr" }) as never,
+    );
+    const previous = process.env.APP_VERSION;
+    process.env.APP_VERSION = "1.2.3.0";
+
+    try {
+      const bindings = await getServerLogBindings();
+      expect(bindings.appVersion).toBe("1.2.3.0");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.APP_VERSION;
+      } else {
+        process.env.APP_VERSION = previous;
+      }
+    }
   });
 });

@@ -5,6 +5,9 @@ parameters:
     type: string
   - name: localImageTag
     type: string
+  - name: appVersion
+    type: string
+    default: 0.0.0.0-local
   - name: acrServiceConnection
     type: string
   - name: acrLoginServer
@@ -74,6 +77,7 @@ steps:
       buildContext: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
       repository: ${{ parameters.imageRepository }}
       tags: ${{ parameters.localImageTag }}
+      arguments: --build-arg APP_VERSION=${{ parameters.appVersion }}
       addPipelineData: false
       addBaseImageData: false
 

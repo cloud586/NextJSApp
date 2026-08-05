@@ -31,6 +31,7 @@ describe("clientLogger", () => {
         correlationId: "corr-2",
         logger: "WrappedLogger",
         source: "client",
+        appVersion: "0.0.0.0-local",
       },
     });
   });

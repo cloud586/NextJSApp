@@ -4,6 +4,9 @@ parameters:
   - name: sonarCloudServiceConnection
     type: string
     default: sonarcloud-sutoremu
+  - name: projectVersion
+    type: string
+    default: 0.0.0.0-local
 
 steps:
   - task: SonarCloudPrepare@4
@@ -21,3 +24,4 @@ steps:
         sonar.organization=$(sonar:organization)
         sonar.projectKey=$(sonar:project-key)
         sonar.projectBaseDir=$(Build.SourcesDirectory)/${{ parameters.workingDirectory }}
+        sonar.projectVersion=${{ parameters.projectVersion }}
