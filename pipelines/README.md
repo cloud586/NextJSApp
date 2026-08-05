@@ -157,7 +157,8 @@ Install these DevOps extensions in your organization:
 |-----------|-------------|---------|
 | [Azure App Configuration](https://marketplace.visualstudio.com/items?itemName=AzureAppConfiguration.azure-app-configuration-tasks) | `AzureAppConfiguration.azure-app-configuration-tasks` | `AzureAppConfigurationExport@10`, `AzureAppConfigurationImport@10` |
 | [SonarQube Cloud](https://marketplace.visualstudio.com/items?itemName=SonarSource.sonarcloud) | `SonarSource.sonarcloud` | `SonarCloudPrepare@4`, `SonarCloudAnalyze@4`, `SonarCloudPublish@4` |
-| [GitTools](https://marketplace.visualstudio.com/items?itemName=gittools.gittools) | `gittools.gittools` | `gittools.gitversion.setup@0`, `gittools.gitversion.execute@0` |
+| [GitTools](https://marketplace.visualstudio.com/items?itemName=gittools.gittools) | `gittools.gittools` | `gitversion-setup@4`, `gitversion-execute@4` |
+
 
 
 > Use the **SonarQube Cloud** extension (`SonarSource.sonarcloud`), not the older **SonarQube Server** extension (`SonarSource.sonarqube`). The Server tasks (`SonarQubePrepare@6`, etc.) are a different product and will fail with "task is missing" if only Cloud is installed.

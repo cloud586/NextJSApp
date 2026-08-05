@@ -1,17 +1,15 @@
 # Calculates Major.Minor.Patch.Revision via GitVersion and exports pipeline outputs
 # for later stages (ACR tags, auto-tag, Docker, Node stamp).
 #
-# Use fully qualified GitTools task IDs (gittools.gitversion.*@0).
-# Short names like gitversion/setup@3 are GitHub Actions IDs and are not
-# registered by the Azure DevOps marketplace extension.
+# GitTools Azure DevOps task names: gitversion-setup / gitversion-execute (v4).
 
 steps:
-  - task: gittools.gitversion.setup@0
+  - task: gitversion-setup@4
     displayName: Install GitVersion
     inputs:
       versionSpec: '5.12.0'
 
-  - task: gittools.gitversion.execute@0
+  - task: gitversion-execute@4
     displayName: Calculate version
     inputs:
       useConfigFile: true
