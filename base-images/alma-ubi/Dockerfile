@@ -1,7 +1,9 @@
 FROM almalinux:9-minimal
 
+# No git: it pulls openssh/openssh-clients, which are unused at runtime and
+# repeatedly surface client-side OpenSSH CVEs in Trivy (e.g. ALSA-2026:47756).
 RUN microdnf update -y \
-    && microdnf install -y bash git unzip tar gzip openssl findutils which ca-certificates \
+    && microdnf install -y bash unzip tar gzip openssl findutils which ca-certificates \
     && microdnf clean all \
     && rm -rf /var/cache/dnf /var/cache/yum
 
