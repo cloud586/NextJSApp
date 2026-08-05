@@ -17,15 +17,34 @@ steps:
       configFilePath: GitVersion.yml
 
   # Compose four-part appVersion and expose cross-stage outputs.
-  # VersionSourceDistance is Revision (0 on tagged trunk commits).
-  # GitTools ADO tasks export GitVersion_* (underscore) variables.
+  # Revision = CommitsSinceVersionSource (GitVersion 6.2 does not export
+  # VersionSourceDistance; missing ADO macros expand to the literal $(...) text).
   - bash: |
       set -euo pipefail
+
+      # Reject unexpanded Azure DevOps macros like $(GitVersion_Foo)
+      is_macro() {
+        case "${1:-}" in
+          *'$(GitVersion'*|*'$(Build.'*) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
       MAJOR="${GITVERSION_MAJOR:-}"
       MINOR="${GITVERSION_MINOR:-}"
       PATCH="${GITVERSION_PATCH:-}"
-      REVISION="${GITVERSION_VERSION_SOURCE_DISTANCE:-${GITVERSION_COMMITS_SINCE_VERSION_SOURCE:-0}}"
       TAG_VERSION="${GITVERSION_MAJOR_MINOR_PATCH:-}"
+      REVISION="${GITVERSION_COMMITS_SINCE_VERSION_SOURCE:-0}"
+
+      if is_macro "$MAJOR" || is_macro "$MINOR" || is_macro "$PATCH" || is_macro "$TAG_VERSION"; then
+        echo "##vso[task.logissue type=error]GitVersion macros did not expand (got literal \$(GitVersion_*) values)"
+        echo "MAJOR='${MAJOR}' MINOR='${MINOR}' PATCH='${PATCH}' TAG='${TAG_VERSION}'"
+        exit 1
+      fi
+
+      if is_macro "$REVISION" || [ -z "$REVISION" ]; then
+        REVISION="0"
+      fi
 
       if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ] || [ -z "$TAG_VERSION" ]; then
         echo "##vso[task.logissue type=error]GitVersion variables missing after execute"
@@ -54,6 +73,5 @@ steps:
       GITVERSION_MINOR: $(GitVersion_Minor)
       GITVERSION_PATCH: $(GitVersion_Patch)
       GITVERSION_MAJOR_MINOR_PATCH: $(GitVersion_MajorMinorPatch)
-      GITVERSION_VERSION_SOURCE_DISTANCE: $(GitVersion_VersionSourceDistance)
       GITVERSION_COMMITS_SINCE_VERSION_SOURCE: $(GitVersion_CommitsSinceVersionSource)
       BUILD_SOURCEVERSION: $(Build.SourceVersion)
