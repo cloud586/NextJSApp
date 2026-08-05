@@ -96,7 +96,8 @@ Canonical version string: **`Major.Minor.Patch.Revision`**.
 | Segment | Meaning |
 |---------|---------|
 | Major / Minor / Patch | GitVersion TrunkBased (`workflow: TrunkBased/preview1`); bump with `+semver: major\|minor\|patch` on the merge commit (default Patch) |
-| Revision | `PreReleaseNumber` when > 0 (PR/feature commit counter); else `CommitsSinceVersionSource`; else `0` on clean trunk/tagged builds |
+| Revision | `PreReleaseNumber` (>0), else `CommitsSinceVersionSource` (>0), else PR number, else commits since last `v*` tag; `0` only when none apply |
+
 
 
 - **Git tags:** `vMajor.Minor.Patch` (three-part; GitVersion source of truth)
