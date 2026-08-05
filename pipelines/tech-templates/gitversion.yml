@@ -2,12 +2,13 @@
 # for later stages (ACR tags, auto-tag, Docker, Node stamp).
 #
 # GitTools Azure DevOps task names: gitversion-setup / gitversion-execute (v4).
+# v4.7+ requires GitVersion >=6.2.0 <7.0.0.
 
 steps:
   - task: gitversion-setup@4
     displayName: Install GitVersion
     inputs:
-      versionSpec: '5.12.0'
+      versionSpec: '6.2.x'
 
   - task: gitversion-execute@4
     displayName: Calculate version
@@ -16,14 +17,14 @@ steps:
       configFilePath: GitVersion.yml
 
   # Compose four-part appVersion and expose cross-stage outputs.
-  # CommitsSinceVersionSource is Revision (0 on tagged trunk commits).
+  # VersionSourceDistance is Revision (0 on tagged trunk commits).
   # GitTools ADO tasks export GitVersion_* (underscore) variables.
   - bash: |
       set -euo pipefail
       MAJOR="${GITVERSION_MAJOR:-}"
       MINOR="${GITVERSION_MINOR:-}"
       PATCH="${GITVERSION_PATCH:-}"
-      REVISION="${GITVERSION_COMMITS_SINCE_VERSION_SOURCE:-0}"
+      REVISION="${GITVERSION_VERSION_SOURCE_DISTANCE:-${GITVERSION_COMMITS_SINCE_VERSION_SOURCE:-0}}"
       TAG_VERSION="${GITVERSION_MAJOR_MINOR_PATCH:-}"
 
       if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ] || [ -z "$TAG_VERSION" ]; then
@@ -53,5 +54,6 @@ steps:
       GITVERSION_MINOR: $(GitVersion_Minor)
       GITVERSION_PATCH: $(GitVersion_Patch)
       GITVERSION_MAJOR_MINOR_PATCH: $(GitVersion_MajorMinorPatch)
+      GITVERSION_VERSION_SOURCE_DISTANCE: $(GitVersion_VersionSourceDistance)
       GITVERSION_COMMITS_SINCE_VERSION_SOURCE: $(GitVersion_CommitsSinceVersionSource)
       BUILD_SOURCEVERSION: $(Build.SourceVersion)

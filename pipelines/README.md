@@ -28,7 +28,7 @@ pipelines/
     docker-trivy-scan.yml
     docker-push-acr.yml
 
-GitVersion.yml                       # Mainline config (repo root)
+GitVersion.yml                       # TrunkBased config (repo root)
 base-images/
   alma-ubi/Dockerfile                # Shared Alma Linux base (published as alma-ubi)
 ```
@@ -89,19 +89,20 @@ Path filters: `nextjsapp/**`, `pipelines/**`, `GitVersion.yml` (does **not** inc
 | Tag `v*` on trunk | yes | full validation | prod ACR (same four-part version) | do not re-tag |
 | Push to feature branch (no PR) | no | — | — | — |
 
-## Versioning (GitVersion Mainline)
+## Versioning (GitVersion TrunkBased)
 
 Canonical version string: **`Major.Minor.Patch.Revision`**.
 
 | Segment | Meaning |
 |---------|---------|
-| Major / Minor / Patch | GitVersion Mainline; bump with `+semver: major\|minor\|patch` on the merge commit (default Patch) |
-| Revision | Commits since version source (`0` on a tagged trunk release) |
+| Major / Minor / Patch | GitVersion TrunkBased (`workflow: TrunkBased/preview1`); bump with `+semver: major\|minor\|patch` on the merge commit (default Patch) |
+| Revision | Commits since version source / `VersionSourceDistance` (`0` on a tagged trunk release) |
 
 - **Git tags:** `vMajor.Minor.Patch` (three-part; GitVersion source of truth)
 - **ACR / Docker `APP_VERSION` / logs / Sonar:** four-part `Major.Minor.Patch.Revision`
 - **`package.json`:** stamped in CI to three-part `Major.Minor.Patch` only (npm SemVer); not committed
 - **Pre-build:** GitVersion → stamp Node env + `package.json` → `npm run build` → Docker `--build-arg APP_VERSION`
+- **Tooling:** `gitversion-setup@4` / `gitversion-execute@4` with GitVersion `6.2.x` (required by GitTools v4.7+)
 
 Trunk-based rules: single long-lived `main`, short-lived PRs, every successful trunk publish is releasable, no GitFlow release branches.
 
@@ -116,7 +117,7 @@ Trunk-based rules: single long-lived `main`, short-lived PRs, every successful t
 
 ### Next.js app
 
-1. **GitVersion** — Mainline calculate; export `appVersion` / `appVersionTag` (cross-stage outputs)
+1. **GitVersion** — TrunkBased calculate; export `appVersion` / `appVersionTag` (cross-stage outputs)
 2. **Load config** — `AzureAppConfigurationExport@10` reads `cicd:*` keys (dev store for build; env-specific store for publish)
 3. **Restore** — `npm ci` with npm cache
 4. **Stamp version** — `package.json` + `APP_VERSION` / `NEXT_PUBLIC_APP_VERSION`

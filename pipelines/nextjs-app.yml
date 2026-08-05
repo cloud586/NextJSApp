@@ -3,7 +3,7 @@
 # Release: v* tags on main publish to prod ACR (same Major.Minor.Patch.Revision).
 # PRs to main run full validation without publishing.
 #
-# Versioning: GitVersion Mainline (see /GitVersion.yml). Canonical artifact version
+# Versioning: GitVersion TrunkBased (see /GitVersion.yml). Canonical artifact version
 # is Major.Minor.Patch.Revision. CI/CD settings load from Azure App Configuration.
 #
 # Registered in Azure DevOps (sutoremu) against this GitHub repository.

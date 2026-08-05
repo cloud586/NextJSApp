@@ -1,37 +1,32 @@
-# Trunk-based Mainline versioning for nextjsapp.
+# Trunk-based versioning for nextjsapp (GitVersion 6+).
 # Canonical artifact/runtime version: Major.Minor.Patch.Revision
-#   Revision = commits since version source (0 on a tagged trunk release).
+#   Revision = VersionSourceDistance (commits since version source; 0 on tagged trunk).
 # Git tags remain three-part: vMajor.Minor.Patch
 #
 # Bump intent on merge commits / PR titles: +semver: major|minor|patch (default Patch).
+#
+# mode: Mainline was removed in GitVersion 6 — use TrunkBased workflow instead.
 
-mode: Mainline
+workflow: TrunkBased/preview1
 next-version: 0.1.0
 
-assembly-file-versioning-format: '{Major}.{Minor}.{Patch}.{CommitsSinceVersionSource}'
-assembly-versioning-format: '{Major}.{Minor}.{Patch}.{CommitsSinceVersionSource}'
+assembly-file-versioning-format: '{Major}.{Minor}.{Patch}.{VersionSourceDistance}'
+assembly-versioning-format: '{Major}.{Minor}.{Patch}.{VersionSourceDistance}'
 
 branches:
   main:
     regex: ^main$
-    mode: Mainline
-    tag: ''
     increment: Patch
-    prevent-increment-of-merged-branch-version: true
-    track-merge-target: false
-    is-mainline: true
+    label: ''
+    is-main-branch: true
     source-branches: []
   pull-request:
     regex: ^(pull|pull\-requests|pr)[/-]
-    mode: ContinuousDelivery
-    tag: pullrequest
+    label: pullrequest
     increment: Inherit
-    tag-number-pattern: '[/-](?<number>\d+)[-/]'
-    track-merge-target: false
+    label-number-pattern: '[/-](?<number>\d+)[-/]'
     source-branches:
       - main
 
 ignore:
   sha: []
-
-merge-message-formats: {}
