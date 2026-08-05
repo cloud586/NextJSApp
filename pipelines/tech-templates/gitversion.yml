@@ -16,45 +16,59 @@ steps:
       useConfigFile: true
       configFilePath: GitVersion.yml
 
-  # Compose four-part appVersion and expose cross-stage outputs.
-  # Revision = CommitsSinceVersionSource (GitVersion 6.2 does not export
-  # VersionSourceDistance; missing ADO macros expand to the literal $(...) text).
+  # Compose four-part appVersion from GitVersion JSON (not ADO macros).
+  # Under TrunkBased/Mainline, CommitsSinceVersionSource is often 0 because the
+  # patch was already incremented; PreReleaseNumber carries the commit counter
+  # on PR/feature branches. Revision preference:
+  #   1) PreReleaseNumber when > 0
+  #   2) CommitsSinceVersionSource when > 0
+  #   3) else 0 (clean trunk / tagged release)
   - bash: |
       set -euo pipefail
 
-      # Reject unexpanded Azure DevOps macros like $(GitVersion_Foo)
-      is_macro() {
-        case "${1:-}" in
-          *'$(GitVersion'*|*'$(Build.'*) return 0 ;;
-          *) return 1 ;;
-        esac
-      }
-
-      MAJOR="${GITVERSION_MAJOR:-}"
-      MINOR="${GITVERSION_MINOR:-}"
-      PATCH="${GITVERSION_PATCH:-}"
-      TAG_VERSION="${GITVERSION_MAJOR_MINOR_PATCH:-}"
-      REVISION="${GITVERSION_COMMITS_SINCE_VERSION_SOURCE:-0}"
-
-      if is_macro "$MAJOR" || is_macro "$MINOR" || is_macro "$PATCH" || is_macro "$TAG_VERSION"; then
-        echo "##vso[task.logissue type=error]GitVersion macros did not expand (got literal \$(GitVersion_*) values)"
-        echo "MAJOR='${MAJOR}' MINOR='${MINOR}' PATCH='${PATCH}' TAG='${TAG_VERSION}'"
+      if ! command -v dotnet-gitversion >/dev/null 2>&1; then
+        echo "##vso[task.logissue type=error]dotnet-gitversion not on PATH; gitversion-setup must run first"
         exit 1
       fi
 
-      if is_macro "$REVISION" || [ -z "$REVISION" ]; then
-        REVISION="0"
+      GV_JSON="$(dotnet-gitversion /config GitVersion.yml /output json)"
+      echo "GitVersion JSON:"
+      echo "${GV_JSON}"
+
+      MAJOR="$(echo "${GV_JSON}" | jq -r '.Major')"
+      MINOR="$(echo "${GV_JSON}" | jq -r '.Minor')"
+      PATCH="$(echo "${GV_JSON}" | jq -r '.Patch')"
+      TAG_VERSION="$(echo "${GV_JSON}" | jq -r '.MajorMinorPatch')"
+      COMMITS="$(echo "${GV_JSON}" | jq -r '.CommitsSinceVersionSource // 0')"
+      PRE_RELEASE="$(echo "${GV_JSON}" | jq -r '.PreReleaseNumber // 0')"
+
+      if [ -z "$MAJOR" ] || [ "$MAJOR" = "null" ] || \
+         [ -z "$MINOR" ] || [ "$MINOR" = "null" ] || \
+         [ -z "$PATCH" ] || [ "$PATCH" = "null" ] || \
+         [ -z "$TAG_VERSION" ] || [ "$TAG_VERSION" = "null" ]; then
+        echo "##vso[task.logissue type=error]GitVersion JSON missing Major/Minor/Patch/MajorMinorPatch"
+        exit 1
       fi
 
-      if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ] || [ -z "$TAG_VERSION" ]; then
-        echo "##vso[task.logissue type=error]GitVersion variables missing after execute"
-        echo "MAJOR='${MAJOR}' MINOR='${MINOR}' PATCH='${PATCH}' TAG='${TAG_VERSION}'"
-        exit 1
+      if [ "$PRE_RELEASE" = "null" ] || [ -z "$PRE_RELEASE" ]; then
+        PRE_RELEASE=0
+      fi
+      if [ "$COMMITS" = "null" ] || [ -z "$COMMITS" ]; then
+        COMMITS=0
+      fi
+
+      if [ "$PRE_RELEASE" -gt 0 ]; then
+        REVISION="$PRE_RELEASE"
+      elif [ "$COMMITS" -gt 0 ]; then
+        REVISION="$COMMITS"
+      else
+        REVISION=0
       fi
 
       APP_VERSION="${MAJOR}.${MINOR}.${PATCH}.${REVISION}"
       SHORT_SHA="$(echo "${BUILD_SOURCEVERSION}" | cut -c1-7)"
 
+      echo "PreReleaseNumber=${PRE_RELEASE} CommitsSinceVersionSource=${COMMITS} -> Revision=${REVISION}"
       echo "appVersion=${APP_VERSION}"
       echo "appVersionTag=${TAG_VERSION}"
       echo "shortSha=${SHORT_SHA}"
@@ -69,9 +83,4 @@ steps:
     name: SetAppVersion
     displayName: Export appVersion outputs
     env:
-      GITVERSION_MAJOR: $(GitVersion_Major)
-      GITVERSION_MINOR: $(GitVersion_Minor)
-      GITVERSION_PATCH: $(GitVersion_Patch)
-      GITVERSION_MAJOR_MINOR_PATCH: $(GitVersion_MajorMinorPatch)
-      GITVERSION_COMMITS_SINCE_VERSION_SOURCE: $(GitVersion_CommitsSinceVersionSource)
       BUILD_SOURCEVERSION: $(Build.SourceVersion)
