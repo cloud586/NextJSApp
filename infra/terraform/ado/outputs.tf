@@ -26,8 +26,10 @@ output "environment_ids" {
   value = {
     "dev-acr"  = azuredevops_environment.dev_acr.id
     "prod-acr" = azuredevops_environment.prod_acr.id
+    "dev"      = azuredevops_environment.dev.id
+    "prod"     = azuredevops_environment.prod.id
   }
-  description = "ADO environment IDs used by PublishDev / PublishProd."
+  description = "ADO environment IDs used by CI publish stages and CD Container App deploys."
 }
 
 output "acr_registry_url" {
@@ -38,4 +40,9 @@ output "acr_registry_url" {
 output "subscription_id" {
   value       = local.subscription_id
   description = "Azure subscription ID used by both ARM service connections."
+}
+
+output "prod_approval_check_id" {
+  value       = azuredevops_check_approval.prod.id
+  description = "ADO approval check ID on the prod environment (CD Prod stage)."
 }

@@ -1,0 +1,37 @@
+# Container App CD pipeline for the Next.js app.
+# Triggered when nextjs-app CI finishes PublishDev (image already in ACR).
+# Dev deploys automatically. Prod is approval-gated and skipped unless CI built
+# from main or hotfix/*.
+#
+# The runnable image is pulled from ACR by the Container App (UAMI). CD does not
+# download the CI docker-image artifact.
+#
+# Registered in Azure DevOps (sutoremu). The resources.pipelines source name
+# must match the CI pipeline's ADO name (nextjs-app).
+
+trigger: none
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: ci
+      source: nextjs-app
+      trigger:
+        stages:
+          - PublishDev
+        branches:
+          include:
+            - main
+            - hotfix/*
+
+extends:
+  template: pipeline-templates/node-service-release.yml
+  parameters:
+    ciPipelineResource: ci
+    # Match terraform output app_configuration_endpoint per environment.
+    devAppConfigEndpoint: https://nextjsappdevappcfg.azconfig.io
+    prodAppConfigEndpoint: https://nextjsappprodappcfg.azconfig.io
+    devContainerAppName: nextjsapp-dev-app
+    prodContainerAppName: nextjsapp-prod-app
+    devResourceGroup: nextjsapp-dev-rg
+    prodResourceGroup: nextjsapp-prod-rg

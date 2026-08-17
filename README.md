@@ -10,7 +10,7 @@ Next.js marketing/app foundation for **Sutoremu**, with LaunchDarkly feature fla
 | Config & secrets | Azure App Configuration + Key Vault refs at container start |
 | Containers | Alma base image (`base-images/alma-ubi`) + app `Dockerfile.runtime`, standalone Next build |
 | Infra | Terraform: ACR, Container Apps, KV, App Config, static assets, DNS, CI/CD SP, ADO service connections |
-| CI/CD | Azure DevOps → GitHub; alma-base-image + nextjs-app; lint/build/test/Sonar/Docker/Trivy; ACR publish on trunk/tags |
+| CI/CD | Azure DevOps → GitHub; alma-base-image + nextjs-app CI + nextjs-app-cd; lint/build/test/Sonar/Docker/Trivy; ACR publish on trunk/hotfix/tags; Container App deploy from ACR |
 | Tests | Vitest (unit + component + coverage), Cypress e2e (+ optional coverage) |
 
 ## Repository layout
@@ -118,19 +118,19 @@ See [infra/terraform/README.md](infra/terraform/README.md) for backends, seeding
 
 Azure DevOps project [sutoremu](https://dev.azure.com/SephieBox/sutoremu) builds from this GitHub repo. CI settings are loaded at runtime from **Azure App Configuration** (`cicd:*` keys, including Key Vault refs) — no ADO variable groups.
 
-**Flow:** Alma base (`alma-base-image`) publishes `alma-ubi:latest` to ACR. App pipeline (`nextjs-app`): export App Config → restore → Sonar prepare → lint/build → Vitest coverage → Sonar analyze/publish → pull base + Docker runtime build → Trivy → conditional ACR push.
+**Flow:** Alma base (`alma-base-image`) publishes `alma-ubi:latest` to ACR. App CI (`nextjs-app`): export App Config → restore → Sonar prepare → lint/build → Vitest coverage → Sonar analyze/publish → pull base + Docker runtime build → Trivy → conditional ACR push. App CD (`nextjs-app-cd`) starts after `PublishDev` and deploys that ACR tag to Container Apps (`AzureContainerApps@1`; Dev auto, Prod approval-gated on `main` / `hotfix/*`).
 
-| Event | Validate | Publish |
-|-------|----------|---------|
-| PR → `main` | yes | no |
-| Merge to `main` | yes | ACR (`alma-ubi:latest` and/or app tags) |
-| Tag `v*` on trunk | yes (app) | prod ACR (app) |
+| Event | Validate | Publish | Container App |
+|-------|----------|---------|----------------|
+| PR → `main` or `hotfix/*` | yes | no | no |
+| Merge to `main` / push `hotfix/*` | yes | dev ACR | CD Dev (auto); CD Prod if main/hotfix (approval) |
+| Tag `v*` on trunk | yes (app) | prod ACR (app) | no (ACA rollout is the CD path) |
 
-Entrypoints: [`pipelines/alma-base-image.yml`](pipelines/alma-base-image.yml), [`pipelines/nextjs-app.yml`](pipelines/nextjs-app.yml). Full setup (extensions, Terraform-managed service connections/environments): [pipelines/README.md](pipelines/README.md). Apply order for connections: [infra/terraform/README.md](infra/terraform/README.md) (cicd → dev → ado).
+Entrypoints: [`pipelines/alma-base-image.yml`](pipelines/alma-base-image.yml), [`pipelines/nextjs-app.yml`](pipelines/nextjs-app.yml), [`pipelines/nextjs-app-cd.yml`](pipelines/nextjs-app-cd.yml). Full setup (extensions, Terraform-managed service connections/environments): [pipelines/README.md](pipelines/README.md). Apply order for connections: [infra/terraform/README.md](infra/terraform/README.md) (cicd → dev → ado).
 
 ### Out of scope (follow-up)
 
-- Container App **deploy** release pipeline (image push only today)
+- Standing prod Azure back up (Prod CD stage is wired; it will fail until `nextjsapp-prod-app` exists)
 - Automated static asset upload in CI
 - Cypress e2e in the build pipeline (local / future nightly)
 

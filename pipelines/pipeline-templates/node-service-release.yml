@@ -1,0 +1,103 @@
+# CD orchestration: deploy the CI-published ACR image to Container Apps.
+# Dev always runs after PublishDev. Prod runs only for main / hotfix/* and waits
+# on the ADO `prod` environment approval gate.
+#
+# Use resources.pipeline.ci.sourceBranch (not Build.SourceBranch) — on a pipeline
+# resource trigger, Build.SourceBranch is the CD YAML branch.
+
+parameters:
+  - name: ciPipelineResource
+    type: string
+    default: ci
+  - name: devAppConfigEndpoint
+    type: string
+  - name: prodAppConfigEndpoint
+    type: string
+  - name: devAzureServiceConnection
+    type: string
+    default: azure-dev-subscription
+  - name: prodAzureServiceConnection
+    type: string
+    default: azure-prod-subscription
+  - name: devContainerAppName
+    type: string
+    default: nextjsapp-dev-app
+  - name: prodContainerAppName
+    type: string
+    default: nextjsapp-prod-app
+  - name: devResourceGroup
+    type: string
+    default: nextjsapp-dev-rg
+  - name: prodResourceGroup
+    type: string
+    default: nextjsapp-prod-rg
+
+stages:
+  - stage: Dev
+    displayName: Deploy Dev
+    jobs:
+      - deployment: DeployDev
+        displayName: Deploy Container App (dev)
+        pool:
+          vmImage: ubuntu-latest
+        environment: dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none
+
+                - template: ../tech-templates/load-release-metadata.yml
+                  parameters:
+                    pipelineResource: ${{ parameters.ciPipelineResource }}
+
+                - template: ../tech-templates/export-app-config.yml
+                  parameters:
+                    azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
+                    appConfigEndpoint: ${{ parameters.devAppConfigEndpoint }}
+                    appConfigLabel: dev
+
+                - template: ../tech-templates/deploy-container-app.yml
+                  parameters:
+                    azureServiceConnection: ${{ parameters.devAzureServiceConnection }}
+                    containerAppName: ${{ parameters.devContainerAppName }}
+                    resourceGroup: ${{ parameters.devResourceGroup }}
+
+  - stage: Prod
+    displayName: Deploy Prod
+    dependsOn: Dev
+    condition: |
+      and(
+        succeeded(),
+        or(
+          eq(variables['resources.pipeline.${{ parameters.ciPipelineResource }}.sourceBranch'], 'refs/heads/main'),
+          startsWith(variables['resources.pipeline.${{ parameters.ciPipelineResource }}.sourceBranch'], 'refs/heads/hotfix/')
+        )
+      )
+    jobs:
+      - deployment: DeployProd
+        displayName: Deploy Container App (prod)
+        pool:
+          vmImage: ubuntu-latest
+        environment: prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none
+
+                - template: ../tech-templates/load-release-metadata.yml
+                  parameters:
+                    pipelineResource: ${{ parameters.ciPipelineResource }}
+
+                - template: ../tech-templates/export-app-config.yml
+                  parameters:
+                    azureServiceConnection: ${{ parameters.prodAzureServiceConnection }}
+                    appConfigEndpoint: ${{ parameters.prodAppConfigEndpoint }}
+                    appConfigLabel: prod
+
+                - template: ../tech-templates/deploy-container-app.yml
+                  parameters:
+                    azureServiceConnection: ${{ parameters.prodAzureServiceConnection }}
+                    containerAppName: ${{ parameters.prodContainerAppName }}
+                    resourceGroup: ${{ parameters.prodResourceGroup }}

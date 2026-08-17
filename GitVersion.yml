@@ -4,6 +4,7 @@
 # Git tags remain three-part: vMajor.Minor.Patch
 #
 # Bump intent on merge commits / PR titles: +semver: major|minor|patch (default Patch).
+# Hotfix branches (hotfix/* or hotfix-*) publish via CI and may roll to Prod CD.
 #
 # Four-part Assembly* formats are composed in the pipeline (GitVersion 6 format
 # strings do not expose VersionSourceDistance as a format member).
@@ -18,9 +19,16 @@ branches:
     label: ''
     is-main-branch: true
     source-branches: []
+  hotfix:
+    regex: ^hotfix[/-]
+    increment: Patch
+    label: ''
+    source-branches:
+      - main
   pull-request:
     regex: ^(pull|pull\-requests|pr)[/-]
     label: pullrequest
     increment: Inherit
     source-branches:
       - main
+      - hotfix

@@ -108,7 +108,7 @@ The client secret is still required for **Docker Registry** service connections 
 
 ## Step 2c — Azure DevOps service connections
 
-Creates the service connections and environments expected by [`pipelines/nextjs-app.yml`](../../pipelines/nextjs-app.yml) in project [SephieBox/sutoremu](https://dev.azure.com/SephieBox/sutoremu). Does **not** create the ADO org or project — those are looked up.
+Creates the service connections and environments expected by [`pipelines/nextjs-app.yml`](../../pipelines/nextjs-app.yml) and [`pipelines/nextjs-app-cd.yml`](../../pipelines/nextjs-app-cd.yml) in project [SephieBox/sutoremu](https://dev.azure.com/SephieBox/sutoremu). Does **not** create the ADO org or project — those are looked up.
 
 | Name | Type | Azure target (current) |
 |------|------|------------------------|
@@ -117,7 +117,8 @@ Creates the service connections and environments expected by [`pipelines/nextjs-
 | `acr-dev` | Docker Registry | Dev ACR |
 | `acr-prod` | Docker Registry | **Same as** dev ACR (cost alias) |
 | `sonarcloud-sutoremu` | SonarCloud | SonarQube Cloud |
-| `dev-acr` / `prod-acr` | Environments | Pipeline deployment environments |
+| `dev-acr` / `prod-acr` | Environments | CI ACR publish (no approval) |
+| `dev` / `prod` | Environments | CD Container App deploy (`prod` has a Terraform-managed Approvals check) |
 
 Prerequisites: cicd + **dev** applied (so remote state has `client_id` / `client_secret` and `subscription_id` / `acr_login_server`). If `subscription_id` is missing from dev outputs, re-apply or refresh the dev stack first.
 
@@ -131,6 +132,8 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init -backend-config=backend.hcl
 terraform apply
 ```
+
+The `prod` environment gets an **Approvals** check from Terraform (`azuredevops_check_approval`). Default approver is the project **Project Administrators** group; add emails via `prod_approver_emails` if you want named users. That gate applies only to the CD Prod stage — not `prod-acr` image publish.
 
 When you stand prod Azure back up, re-point the two prod-named connections at prod subscription/ACR (and add prod remote state) without renaming pipeline parameters.
 
@@ -216,7 +219,7 @@ az containerapp update `
   --image "$(terraform output -raw acr_login_server)/nextjsapp:latest"
 ```
 
-By default, `container_image` resolves to `<acr_login_server>/nextjsapp:latest`. Push the image before the Container App can start successfully.
+By default, `container_image` resolves to `<acr_login_server>/nextjsapp:latest` for the **initial** Terraform create. After that, image rolls are owned by [`pipelines/nextjs-app-cd.yml`](../../pipelines/nextjs-app-cd.yml); the module ignores image drift so `terraform apply` does not revert CD deploys. Push an image (CI or the manual steps above) before the Container App can start successfully.
 
 ## RBAC summary
 
@@ -228,6 +231,7 @@ By default, `container_image` resolves to `<acr_login_server>/nextjsapp:latest`.
 | CI/CD SP | Key Vault Secrets Officer | Key Vault |
 | CI/CD SP | AcrPush | ACR |
 | CI/CD SP | App Configuration Data Reader | App Configuration |
+| CI/CD SP | Container Apps Contributor | Environment resource group |
 | Terraform operator / CI/CD SP | Storage Blob Data Contributor | Static assets storage account |
 | Terraform operator | Storage Blob Data Contributor | State storage account |
 | Terraform operator | Key Vault Secrets Officer | Key Vault |
@@ -302,6 +306,24 @@ terraform apply
 ```
 
 Dev is configured to **purge Key Vault and App Configuration on destroy** (`purge_soft_delete_on_destroy = true` in `environments/dev/versions.tf`), so future destroy/apply cycles should not hit this again. Prod keeps soft-delete retention and purge protection.
+
+### Key Vault plan refresh (`GetCertificateContacts` / 503)
+
+`terraform plan` refreshes `azurerm_key_vault` via the **data plane** (`https://<vault>.vault.azure.net`), even when this module does not manage certificate contacts. A timeout or `StatusCode=503` (often `AuthorizationDataUnavailable`) is an Azure KV outage or data-plane reachability issue, not a config drift in this stack.
+
+Re-run `terraform plan` after KV recovers. Confirm with:
+
+```powershell
+az keyvault certificate contact list --vault-name nextjsappdevkv
+```
+
+If you must apply an unrelated change while KV is down (for example the CD `Container Apps Contributor` role):
+
+```powershell
+terraform apply -refresh=false -target=azurerm_role_assignment.cicd_container_apps
+```
+
+`-refresh=false` skips state refresh (including the KV contacts call). Do not use it as the default apply path.
 
 | ACA min replicas | 1 | 1 |
 | Custom domain | dev.app.sutoremu.com | app.sutoremu.com |

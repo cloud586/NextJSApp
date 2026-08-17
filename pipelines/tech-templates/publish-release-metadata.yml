@@ -1,0 +1,39 @@
+# Publishes version/tag metadata for the CD pipeline.
+# Text only — the runnable image is consumed from ACR, not this artifact.
+
+parameters:
+  - name: imageRepository
+    type: string
+  - name: appVersion
+    type: string
+  - name: shortSha
+    type: string
+
+steps:
+  - bash: |
+      set -euo pipefail
+      if [ -z "${APP_VERSION:-}" ] || [ -z "${SHORT_SHA:-}" ] || [ -z "${IMAGE_REPOSITORY:-}" ]; then
+        echo "##vso[task.logissue type=error]appVersion/shortSha/imageRepository empty; cannot publish release metadata"
+        exit 1
+      fi
+
+      META_DIR="$(Agent.TempDirectory)/release-metadata"
+      mkdir -p "${META_DIR}"
+      printf 'appVersion=%s\nshortSha=%s\nimageRepository=%s\n' \
+        "${APP_VERSION}" "${SHORT_SHA}" "${IMAGE_REPOSITORY}" \
+        > "${META_DIR}/release.env"
+
+      echo "Published release metadata:"
+      cat "${META_DIR}/release.env"
+    displayName: Write release metadata
+    env:
+      APP_VERSION: ${{ parameters.appVersion }}
+      SHORT_SHA: ${{ parameters.shortSha }}
+      IMAGE_REPOSITORY: ${{ parameters.imageRepository }}
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish release-metadata artifact
+    inputs:
+      targetPath: $(Agent.TempDirectory)/release-metadata
+      artifact: release-metadata
+      publishLocation: pipeline

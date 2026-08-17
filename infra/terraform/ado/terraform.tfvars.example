@@ -11,3 +11,11 @@ sonarcloud_token = "replace-me"
 # Auth for the azuredevops provider (do not commit):
 #   $env:AZDO_PERSONAL_ACCESS_TOKEN = "<pat-with-service-connection-and-environment-manage>"
 #   $env:AZDO_ORG_SERVICE_URL       = "https://dev.azure.com/SephieBox"   # optional; defaults in provider
+
+# Prod CD environment approval (azuredevops_check_approval on environment `prod`).
+# Default approver is the project group "Project Administrators". Optional extra
+# users must already exist in the ADO org (principal name = email).
+# prod_approval_group_name     = "Project Administrators"
+# prod_approver_emails         = ["you@example.com"]
+# prod_requester_can_approve   = true
+# prod_approval_timeout_minutes = 10080

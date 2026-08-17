@@ -39,6 +39,8 @@ variables:
       value: prod
     ${{ elseif eq(variables['Build.SourceBranch'], format('refs/heads/{0}', parameters.trunkBranch)) }}:
       value: dev
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/') }}:
+      value: dev
     ${{ else }}:
       value: none
   - name: localImageTag
@@ -111,6 +113,12 @@ stages:
               imageRepository: ${{ parameters.imageRepository }}
               localImageTag: $(localImageTag)
 
+          - template: ../tech-templates/publish-release-metadata.yml
+            parameters:
+              imageRepository: ${{ parameters.imageRepository }}
+              appVersion: $(appVersion)
+              shortSha: $(shortSha)
+
   - stage: PublishDev
     displayName: Publish to dev ACR
     dependsOn: Build
@@ -149,7 +157,7 @@ stages:
     dependsOn:
       - Build
       - PublishDev
-    condition: and(succeeded(), eq(variables['targetEnvironment'], 'dev'), ne(variables['Build.Reason'], 'PullRequest'))
+    condition: and(succeeded(), eq(variables['isTrunkCommit'], 'True'), ne(variables['Build.Reason'], 'PullRequest'))
     variables:
       appVersionTag: $[stageDependencies.Build.BuildValidate.outputs['SetAppVersion.appVersionTag']]
     jobs:

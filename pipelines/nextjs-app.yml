@@ -1,7 +1,8 @@
 # Trunk-based build pipeline for the Next.js app.
-# CI: merges to main publish to dev ACR, then auto-tag vMajor.Minor.Patch.
+# CI: merges to main (and hotfix/*) publish to dev ACR; trunk then auto-tags vMajor.Minor.Patch.
 # Release: v* tags on main publish to prod ACR (same Major.Minor.Patch.Revision).
-# PRs to main run full validation without publishing.
+# PRs to main/hotfix run full validation without publishing.
+# Container App deploy is a separate pipeline: pipelines/nextjs-app-cd.yml.
 #
 # Versioning: GitVersion TrunkBased (see /GitVersion.yml). Canonical artifact version
 # is Major.Minor.Patch.Revision. CI/CD settings load from Azure App Configuration.
@@ -12,6 +13,7 @@ trigger:
   branches:
     include:
       - main
+      - hotfix/*
   tags:
     include:
       - v*
@@ -25,6 +27,7 @@ pr:
   branches:
     include:
       - main
+      - hotfix/*
   paths:
     include:
       - nextjsapp/**
