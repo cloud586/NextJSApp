@@ -1,0 +1,47 @@
+# Loads version/tag metadata from the triggering CI pipeline.
+# Does not download the docker-image artifact — CD deploys by ACR reference.
+
+parameters:
+  - name: pipelineResource
+    type: string
+    default: ci
+
+steps:
+  - download: none
+
+  - download: ${{ parameters.pipelineResource }}
+    artifact: release-metadata
+    displayName: Download release metadata from CI
+
+  - bash: |
+      set -euo pipefail
+      META="$(Pipeline.Workspace)/${PIPELINE_RESOURCE}/release-metadata/release.env"
+      if [ ! -f "${META}" ]; then
+        echo "##vso[task.logissue type=error]release metadata not found at ${META}"
+        exit 1
+      fi
+
+      read_meta() {
+        grep -E "^${1}=" "${META}" | tail -n1 | cut -d= -f2- | tr -d '\r'
+      }
+
+      APP_VERSION="$(read_meta appVersion)"
+      SHORT_SHA="$(read_meta shortSha)"
+      IMAGE_REPOSITORY="$(read_meta imageRepository)"
+
+      if [ -z "${APP_VERSION}" ] || [ -z "${IMAGE_REPOSITORY}" ]; then
+        echo "##vso[task.logissue type=error]release.env missing appVersion or imageRepository"
+        cat "${META}"
+        exit 1
+      fi
+
+      echo "appVersion=${APP_VERSION}"
+      echo "shortSha=${SHORT_SHA}"
+      echo "imageRepository=${IMAGE_REPOSITORY}"
+
+      echo "##vso[task.setvariable variable=appVersion]${APP_VERSION}"
+      echo "##vso[task.setvariable variable=shortSha]${SHORT_SHA}"
+      echo "##vso[task.setvariable variable=imageRepository]${IMAGE_REPOSITORY}"
+    displayName: Load release metadata
+    env:
+      PIPELINE_RESOURCE: ${{ parameters.pipelineResource }}

@@ -54,6 +54,5 @@ This PR delivers the marketing site foundation, Azure DNS/custom-domain infrastr
 
 ## Out of scope (follow-up)
 
-- Container App deployment (release pipeline)
 - Static asset upload in CI (currently manual / future release step)
 - Cypress e2e in build pipeline

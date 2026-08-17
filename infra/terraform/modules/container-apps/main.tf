@@ -94,4 +94,11 @@ resource "azurerm_container_app" "this" {
       }
     }
   }
+
+  # Image rolls are owned by the ADO CD pipeline (AzureContainerApps@1).
+  lifecycle {
+    ignore_changes = [
+      template[0].container[0].image,
+    ]
+  }
 }

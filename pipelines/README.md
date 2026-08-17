@@ -1,6 +1,6 @@
-# Azure DevOps Build Pipelines
+# Azure DevOps Build and Release Pipelines
 
-Build pipelines for [SephieBox/sutoremu](https://dev.azure.com/SephieBox/sutoremu) using Microsoft-hosted agents (`ubuntu-latest`).
+Build and Container App release pipelines for [SephieBox/sutoremu](https://dev.azure.com/SephieBox/sutoremu) using Microsoft-hosted agents (`ubuntu-latest`).
 
 **Configuration source:** CI/CD settings are loaded at runtime from **Azure App Configuration** (with Key Vault references for secrets). No Azure DevOps variable groups are required.
 
@@ -9,13 +9,18 @@ Build pipelines for [SephieBox/sutoremu](https://dev.azure.com/SephieBox/sutorem
 ```
 pipelines/
   alma-base-image.yml                # Parent: Alma base image (alma-ubi)
-  nextjs-app.yml                     # Parent: Next.js app (triggers + extends)
+  nextjs-app.yml                     # Parent: Next.js app CI (triggers + extends)
+  nextjs-app-cd.yml                  # Parent: Container App CD (pipeline resource trigger)
   pipeline-templates/
     alma-base-image-build.yml        # Base image build + publish
-    node-service-build.yml           # App orchestration + trunk/tag routing + GitVersion
+    node-service-build.yml           # App CI orchestration + trunk/tag routing + GitVersion
+    node-service-release.yml         # App CD: Dev auto, Prod gated (main / hotfix/*)
   tech-templates/
     export-app-config.yml             # AzureAppConfigurationExport@10 — read cicd:* keys
     gitversion.yml                    # GitVersion setup/execute + appVersion outputs
+    publish-release-metadata.yml      # Version/tag artifact for CD (not the image)
+    load-release-metadata.yml         # Read version/tag from triggering CI run
+    deploy-container-app.yml          # AzureContainerApps@1 — ACR image → existing ACA
     stamp-node-version.yml            # Stamp package.json + APP_VERSION env before build
     git-tag-release.yml               # Annotated vMajor.Minor.Patch push to GitHub
     restore-npm.yml
@@ -35,7 +40,7 @@ base-images/
 
 **Layering:** parent pipeline → pipeline template → tech templates.
 
-**Two pipelines:** the Alma base image is built and published separately so security patches can land on `alma-ubi:latest` before app images rebuild and consume it. App builds **pull** `alma-ubi:latest` from ACR; they no longer build the base inline.
+**Three pipelines:** the Alma base image is built and published separately so security patches can land on `alma-ubi:latest` before app images rebuild and consume it. App CI **pulls** `alma-ubi:latest` from ACR and publishes versioned app images. App CD (`nextjs-app-cd`) starts when CI `PublishDev` succeeds and retargets Container Apps at those ACR tags.
 
 > **Bootstrap:** Register and run **alma-base-image** at least once (publish `alma-ubi:latest`) before app builds can succeed.
 
@@ -58,8 +63,8 @@ After export, pipeline variables are named:
 
 | App Config key | Pipeline variable |
 |----------------|-------------------|
-| `cicd:acr:login-server` | `acr:login-server` (aliased to `acrLoginServer` after export — use this in Docker steps; colons break bash `$(var)` expansion) |
-| `cicd:acr:name` | `acr:name` |
+| `cicd:acr:login-server` | `acr:login-server` (aliased to `acrLoginServer` after export — use this in Docker / CD steps; colons break bash `$(var)` expansion) |
+| `cicd:acr:name` | `acr:name` (aliased to `acrName` after export — used by `AzureContainerApps@1`) |
 | `cicd:sonar:organization` | `sonar:organization` |
 | `cicd:sonar:project-key` | `sonar:project-key` |
 | `cicd:sonar:token` | `sonar:token` (Key Vault ref, resolved by export task) |
@@ -84,10 +89,13 @@ Path filters: `nextjsapp/**`, `pipelines/**`, `GitVersion.yml` (does **not** inc
 
 | Event | Auto-trigger | Build/test/scan | Publish | Git tag |
 |-------|--------------|-----------------|---------|---------|
-| PR → `main` | yes | full validation | no | no |
+| PR → `main` or `hotfix/*` | yes | full validation | no | no |
 | Merge to `main` | yes | full validation | dev ACR (`Major.Minor.Patch.Revision`) | auto `vMajor.Minor.Patch` after PublishDev |
+| Push to `hotfix/*` | yes | full validation | dev ACR (four-part version) | no (TagRelease is trunk-only) |
 | Tag `v*` on trunk | yes | full validation | prod ACR (same four-part version) | do not re-tag |
 | Push to feature branch (no PR) | no | — | — | — |
+
+CD (`nextjs-app-cd.yml`) does not use git triggers. It starts when **nextjs-app** `PublishDev` succeeds on `main` or `hotfix/*`.
 
 ## Versioning (GitVersion TrunkBased)
 
@@ -129,9 +137,10 @@ Trunk-based rules: single long-lived `main`, short-lived PRs, every successful t
 7. **SonarQube Cloud** — prepare (`sonar.projectVersion`) → analyze → publish
 8. **Docker build** — pull `alma-ubi:latest`, build `Dockerfile.runtime` with `APP_VERSION`; save image artifact
 9. **Trivy scan** — fail on CRITICAL/HIGH vulnerabilities
-10. **PublishDev** (trunk) — push four-part tags to dev ACR
-11. **TagRelease** (trunk) — annotated `vMajor.Minor.Patch` → GitHub (triggers prod pipeline)
+10. **PublishDev** (trunk / `hotfix/*`) — push four-part tags to dev ACR
+11. **TagRelease** (trunk only) — annotated `vMajor.Minor.Patch` → GitHub (triggers prod ACR publish)
 12. **PublishProd** (tag) — push four-part tags to prod ACR
+13. **CD** (`nextjs-app-cd`, after PublishDev) — deploy the ACR image to Container Apps (see below)
 
 ### Image tags
 
@@ -139,9 +148,17 @@ Trunk-based rules: single long-lived `main`, short-lived PRs, every successful t
 |----------|---------|--------------|----------|------|
 | alma-base-image | Trunk CI (`main`) | dev | ACR | `latest`, `<buildId>` |
 | nextjs-app | Trunk CI (`main`) | dev | ACR | `Major.Minor.Patch.Revision`, `Major.Minor.Patch.Revision-<shortSha>` |
+| nextjs-app | Hotfix (`hotfix/*`) | dev | ACR | `Major.Minor.Patch.Revision`, `Major.Minor.Patch.Revision-<shortSha>` |
 | nextjs-app | Release tag (`v1.2.0`) | prod | ACR | `1.2.0.0`, `1.2.0.0-<shortSha>` |
 
-> Terraform Container Apps still default to `nextjsapp:latest`. Pin `container_image` to a four-part tag manually until a deploy pipeline exists.
+### Next.js app CD (`nextjs-app-cd.yml`)
+
+Triggered by a **pipeline resource** on `nextjs-app` when stage `PublishDev` succeeds (`main` or `hotfix/*`). No git trigger.
+
+1. **Dev** (auto) — export dev App Config, read CI `release-metadata` (version/tag only), [`AzureContainerApps@1`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-container-apps-v1) retargets `nextjsapp-dev-app` at `{acrLoginServer}/nextjsapp:{appVersion}`. The Container App UAMI **pulls the image from ACR**. CD does not download the CI `docker-image` tarball.
+2. **Prod** — runs only when the triggering CI branch is `refs/heads/main` or `refs/heads/hotfix/*` (use `resources.pipeline.ci.sourceBranch`, not `Build.SourceBranch`). Waits on the ADO `prod` environment approval gate, then the same ACR-image deploy against `nextjsapp-prod-app` / `nextjsapp-prod-rg`.
+
+> Prod Azure is currently spooled down; the Prod stage is fully wired and will fail until `nextjsapp-prod-app` exists. While prod ACR aliases to dev, Prod deploys the same tag `PublishDev` already pushed.
 
 ## Azure DevOps Setup
 
@@ -169,10 +186,11 @@ Install these DevOps extensions in your organization:
 
 ### 3. Register the pipelines
 
-Register **both** pipelines in [sutoremu Pipelines](https://dev.azure.com/SephieBox/sutoremu/_build):
+Register these pipelines in [sutoremu Pipelines](https://dev.azure.com/SephieBox/sutoremu/_build):
 
 1. **alma-base-image** — **New pipeline** → **GitHub** → **Existing Azure Pipelines YAML file** → path `/pipelines/alma-base-image.yml`
-2. **nextjs-app** — same flow → path `/pipelines/nextjs-app.yml`
+2. **nextjs-app** — same flow → path `/pipelines/nextjs-app.yml` (ADO name must stay `nextjs-app`; CD `resources.pipelines.source` matches it)
+3. **nextjs-app-cd** — same flow → path `/pipelines/nextjs-app-cd.yml`
 
 Run **alma-base-image** on `main` once so `alma-ubi:latest` exists in ACR before relying on nextjs-app Docker builds.
 
@@ -186,8 +204,8 @@ Apply the [`infra/terraform/ado`](../../infra/terraform/ado) stack after **cicd*
 
 | Name | Type | Purpose | Azure target (current) |
 |------|------|---------|------------------------|
-| `azure-dev-subscription` | Azure Resource Manager (WIF) | Read App Config | Dev subscription |
-| `azure-prod-subscription` | Azure Resource Manager (WIF) | Read App Config | **Same as dev** (prod spooled down) |
+| `azure-dev-subscription` | Azure Resource Manager (WIF) | Read App Config; deploy dev Container App | Dev subscription |
+| `azure-prod-subscription` | Azure Resource Manager (WIF) | Read App Config; deploy prod Container App | **Same as dev** (prod spooled down) |
 | `acr-dev` | Docker Registry | `Docker@2` login/push | Dev ACR |
 | `acr-prod` | Docker Registry | `Docker@2` login/push | **Same as** dev ACR |
 | `sonarcloud-sutoremu` | SonarCloud | SonarQube Cloud tasks | SonarQube Cloud |
@@ -201,8 +219,8 @@ See [Terraform README — Step 2c](../../infra/terraform/README.md#step-2c--azur
 ### 5. Terraform — CI/CD principal, RBAC, and config keys
 
 1. Apply [`infra/terraform/cicd`](../../infra/terraform/cicd) (service principal)
-2. Apply [`infra/terraform/environments/dev`](../../infra/terraform/environments/dev) — RBAC via remote state `principal_id`
-3. Apply [`infra/terraform/ado`](../../infra/terraform/ado) — service connections + environments
+2. Apply [`infra/terraform/environments/dev`](../../infra/terraform/environments/dev) — RBAC via remote state `principal_id` (includes Container Apps Contributor for CD)
+3. Apply [`infra/terraform/ado`](../../infra/terraform/ado) — service connections + environments (`dev-acr` / `prod-acr` / `dev` / `prod`)
 4. Verify the App Config endpoint matches the parent pipeline:
 
 ```powershell
@@ -244,9 +262,13 @@ Created by the ado Terraform stack (authorized for all pipelines):
 | Environment | Approval | Used by |
 |-------------|----------|---------|
 | `dev-acr` | none | PublishDev (alma-base-image + nextjs-app) |
-| `prod-acr` | none by default (add manual approval in ADO if desired) | PublishProd (nextjs-app) |
+| `prod-acr` | none | PublishProd (nextjs-app) |
+| `dev` | none | nextjs-app-cd Dev stage (Container App) |
+| `prod` | Terraform `azuredevops_check_approval` (default: Project Administrators) | nextjs-app-cd Prod stage (Container App) |
 
-TagRelease runs as a normal job (not an environment deployment) after PublishDev and pushes `vMajor.Minor.Patch` to GitHub.
+Do **not** put that gate on `prod-acr` (image publish must stay ungated). Override approvers in the ado stack with `prod_approval_group_name` and/or `prod_approver_emails`.
+
+TagRelease runs as a normal job (not an environment deployment) after PublishDev on **trunk only** and pushes `vMajor.Minor.Patch` to GitHub.
 
 ### 8. Branch protection on `main` (GitHub)
 
@@ -276,15 +298,16 @@ docker build -f Dockerfile.runtime --build-arg APP_VERSION=0.0.0.0-local -t next
 
 ## Adding Another Service
 
-1. Add a parent pipeline with service-specific triggers and App Config endpoints
-2. Create or reuse a pipeline template
-3. Reuse `export-app-config.yml`, `docker-trivy-scan.yml`, `docker-push-acr.yml`
+1. Add a parent CI pipeline with service-specific triggers and App Config endpoints
+2. Create or reuse a pipeline template (`node-service-build.yml` / `node-service-release.yml`)
+3. Reuse `export-app-config.yml`, `docker-trivy-scan.yml`, `docker-push-acr.yml`, `deploy-container-app.yml`
 4. Pull `alma-ubi:latest` from ACR in the Docker build step (same pattern as `docker-build-nextjs.yml`)
+5. Point CD `resources.pipelines.source` at the CI pipeline’s ADO name; deploy by ACR tag, not the `docker-image` artifact
 
 ## Out of Scope (Future)
 
 - Base image version / digest pinning (apps currently consume `latest`)
-- Container App deployment — release pipeline
+- Standing prod Azure back up / re-pointing prod-named service connections
 - Static asset upload — release/deploy pipeline
 - Cypress e2e — nightly or pre-release pipeline
 - Auto-rebuild app images when base `latest` is updated

@@ -59,6 +59,14 @@ resource "azurerm_resource_group" "this" {
   tags     = local.tags
 }
 
+resource "azurerm_role_assignment" "cicd_container_apps" {
+  count = local.cicd_principal_id != null ? 1 : 0
+
+  scope                = azurerm_resource_group.this.id
+  role_definition_name = "Container Apps Contributor"
+  principal_id         = local.cicd_principal_id
+}
+
 module "monitoring" {
   source = "../../modules/monitoring"
 
