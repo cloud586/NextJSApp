@@ -9,10 +9,11 @@ parameters:
     default: 0.0.0.0-local
 
 steps:
+  # Auth is the sonarcloud-sutoremu service connection (sonar.token). Do not set
+  # sonar.login (removed from SonarQube Cloud 2026-06-11) or SONAR_TOKEN — Scanner
+  # CLI 8 ignores the connection when SONAR_TOKEN is set, which 403'd JRE metadata.
   - task: SonarCloudPrepare@4
     displayName: SonarCloud prepare
-    env:
-      SONAR_TOKEN: $(sonar:token)
     inputs:
       SonarCloud: ${{ parameters.sonarCloudServiceConnection }}
       organization: $(sonar:organization)
@@ -20,7 +21,7 @@ steps:
       configMode: file
       configFile: $(Build.SourcesDirectory)/${{ parameters.workingDirectory }}/sonar-project.properties
       extraProperties: |
-        sonar.login=$(sonar:token)
+        sonar.scanner.skipJreProvisioning=true
         sonar.organization=$(sonar:organization)
         sonar.projectKey=$(sonar:project-key)
         sonar.projectBaseDir=$(Build.SourcesDirectory)/${{ parameters.workingDirectory }}

@@ -1,8 +1,6 @@
 steps:
   - task: SonarCloudAnalyze@4
     displayName: SonarCloud analyze
-    env:
-      SONAR_TOKEN: $(sonar:token)
     inputs:
       jdkversion: JAVA_HOME_17_X64
 

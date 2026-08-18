@@ -54,7 +54,7 @@ Terraform writes these keys per environment (label = `dev` or `prod`):
 | `cicd:acr:name` | plain | ACR resource name |
 | `cicd:sonar:organization` | plain | SonarCloud organization key |
 | `cicd:sonar:project-key` | plain | SonarCloud project key |
-| `cicd:sonar:token` | Key Vault ref | SonarCloud API token (`sonar-token` secret) |
+| `cicd:sonar:token` | Key Vault ref | SonarCloud API token (`sonar-token` secret). Analyze auth is the `sonarcloud-sutoremu` service connection, not this variable. |
 | `cicd:github:tag-push-token` | Key Vault ref | GitHub PAT/token for pushing `v*` tags (`github-tag-push-token` secret) |
 
 The pipeline loads these via [`export-app-config.yml`](tech-templates/export-app-config.yml) using the OOTB [`AzureAppConfigurationExport@10`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-app-configuration-export-v10) task (`KeyFilter: cicd:*`, `TrimKeyPrefix: cicd:`).
@@ -67,7 +67,7 @@ After export, pipeline variables are named:
 | `cicd:acr:name` | `acr:name` (aliased to `acrName` after export — used by `AzureContainerApps@1`) |
 | `cicd:sonar:organization` | `sonar:organization` |
 | `cicd:sonar:project-key` | `sonar:project-key` |
-| `cicd:sonar:token` | `sonar:token` (Key Vault ref, resolved by export task) |
+| `cicd:sonar:token` | `sonar:token` (exported; not passed to the scanner) |
 | `cicd:github:tag-push-token` | `github:tag-push-token` (Key Vault ref; used by TagRelease) |
 
 > **Import vs Export:** [`AzureAppConfigurationImport@10`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-app-configuration-import-v10) pushes settings **from a repo config file into** App Configuration (useful for infra/sync pipelines). [`AzureAppConfigurationExport@10`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-app-configuration-export-v10) reads settings **from** App Configuration into pipeline variables — that is what build pipelines need at runtime.
@@ -214,7 +214,7 @@ See [Terraform README — Step 2c](../../infra/terraform/README.md#step-2c--azur
 
 [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) uses the Docker Registry connections (not ARM). Credentials come from the cicd stack SP (`client_id` / `client_secret`).
 
-**SonarCloud:** The service connection token is set in the ado stack. At runtime the pipeline still loads `sonar:token` from App Configuration (Key Vault ref) and passes it via `sonar.login` in `SonarCloudPrepare@4` `extraProperties`.
+**SonarCloud:** Analysis authenticates only through the `sonarcloud-sutoremu` service connection (Terraform `sonarcloud_token` / `TF_VAR_sonarcloud_token`). Do not pass `sonar.login` or `SONAR_TOKEN` — `sonar.login` was removed from SonarQube Cloud on 11 June 2026, and Scanner CLI 8 prefers `SONAR_TOKEN` over the service connection. The scanner uses the agent JDK (`JAVA_HOME_17_X64`) via `sonar.scanner.skipJreProvisioning=true` so it does not call `api.sonarcloud.io/analysis/jres`. If analyze still returns HTTP 403, regenerate the token and re-apply the ado stack; keep Key Vault `sonar-token` in sync if you still seed it.
 
 ### 5. Terraform — CI/CD principal, RBAC, and config keys
 
