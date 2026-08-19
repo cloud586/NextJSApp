@@ -7,7 +7,7 @@
 # download the CI docker-image artifact.
 #
 # Registered in Azure DevOps (sutoremu). The resources.pipelines source name
-# must match the CI pipeline's ADO name (nextjs-app).
+# must match the CI pipeline's ADO name (NextJSApp).
 
 trigger: none
 pr: none
@@ -15,10 +15,11 @@ pr: none
 resources:
   pipelines:
     - pipeline: ci
-      source: nextjs-app
-      # Helps manual runs resolve a default CI run version for this resource.
-      branch: refs/heads/main
+      source: NextJSApp
+      branch: main
       trigger:
+        stages:
+          - PublishDev
         branches:
           include:
             - main

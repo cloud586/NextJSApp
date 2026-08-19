@@ -189,7 +189,7 @@ Install these DevOps extensions in your organization:
 Register these pipelines in [sutoremu Pipelines](https://dev.azure.com/SephieBox/sutoremu/_build):
 
 1. **alma-base-image** — **New pipeline** → **GitHub** → **Existing Azure Pipelines YAML file** → path `/pipelines/alma-base-image.yml`
-2. **nextjs-app** — same flow → path `/pipelines/nextjs-app.yml` (ADO name must stay `nextjs-app`; CD `resources.pipelines.source` matches it)
+2. **NextJSApp** — same flow → path `/pipelines/nextjs-app.yml` (ADO name must match CD `resources.pipelines.source`, currently `NextJSApp`)
 3. **nextjs-app-cd** — same flow → path `/pipelines/nextjs-app-cd.yml`
 
 Run **alma-base-image** on `main` once so `alma-ubi:latest` exists in ACR before relying on nextjs-app Docker builds.
