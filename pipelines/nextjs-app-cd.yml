@@ -19,8 +19,6 @@ resources:
       # Helps manual runs resolve a default CI run version for this resource.
       branch: refs/heads/main
       trigger:
-        stages:
-          - PublishDev
         branches:
           include:
             - main
