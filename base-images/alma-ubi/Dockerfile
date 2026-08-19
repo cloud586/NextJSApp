@@ -1,4 +1,4 @@
-FROM almalinux:9-minimal
+FROM almalinux:9.6-minimal
 
 # No git: it pulls openssh/openssh-clients, which are unused at runtime and
 # repeatedly surface client-side OpenSSH CVEs in Trivy (e.g. ALSA-2026:47756).

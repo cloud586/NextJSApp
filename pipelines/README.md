@@ -214,7 +214,7 @@ See [Terraform README — Step 2c](../../infra/terraform/README.md#step-2c--azur
 
 [`Docker@2`](https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/docker-v2) uses the Docker Registry connections (not ARM). Credentials come from the cicd stack SP (`client_id` / `client_secret`).
 
-**SonarCloud:** Analysis authenticates only through the `sonarcloud-sutoremu` service connection (Terraform `sonarcloud_token` / `TF_VAR_sonarcloud_token`). Do not pass `sonar.login` or `SONAR_TOKEN` — `sonar.login` was removed from SonarQube Cloud on 11 June 2026, and Scanner CLI 8 prefers `SONAR_TOKEN` over the service connection. The scanner uses the agent JDK (`JAVA_HOME_17_X64`) via `sonar.scanner.skipJreProvisioning=true` so it does not call `api.sonarcloud.io/analysis/jres`. If analyze still returns HTTP 403, regenerate the token and re-apply the ado stack; keep Key Vault `sonar-token` in sync if you still seed it.
+**SonarCloud:** Analysis authenticates only through the `sonarcloud-sutoremu` service connection (Terraform `sonarcloud_token` / `TF_VAR_sonarcloud_token`). Do not pass `sonar.login` or `SONAR_TOKEN` — `sonar.login` was removed from SonarQube Cloud on 11 June 2026, and Scanner CLI 8 prefers `SONAR_TOKEN` over the service connection. The scanner uses the agent JDK (`JAVA_HOME_21_X64`) via `sonar.scanner.skipJreProvisioning=true` (SonarQube Cloud requires Java 21+). If analyze still returns HTTP 403, regenerate the token and re-apply the ado stack; keep Key Vault `sonar-token` in sync if you still seed it.
 
 ### 5. Terraform — CI/CD principal, RBAC, and config keys
 
