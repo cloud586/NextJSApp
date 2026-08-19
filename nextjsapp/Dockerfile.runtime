@@ -7,7 +7,6 @@ WORKDIR /app
 USER root
 
 RUN microdnf module reset nodejs \
-    && microdnf update -y \
     && microdnf module enable nodejs:22 -y \
     && microdnf install -y nodejs \
     && microdnf clean all \
@@ -32,7 +31,6 @@ WORKDIR /app
 
 USER root
 RUN microdnf module reset nodejs \
-    && microdnf update -y \
     && microdnf module enable nodejs:22 -y \
     && microdnf install -y nodejs npm \
     && microdnf clean all \
